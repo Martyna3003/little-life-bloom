@@ -1,17 +1,50 @@
-import PetDisplay from "@/components/PetDisplay";
-import PetStats from "@/components/PetStats";
-import ActionButtons from "@/components/ActionButtons";
 import CoinDisplay from "@/components/CoinDisplay";
+import RoomNavigation from "@/components/RoomNavigation";
+import LivingRoom from "@/components/rooms/LivingRoom";
+import Kitchen from "@/components/rooms/Kitchen";
+import Bathroom from "@/components/rooms/Bathroom";
+import GameRoom from "@/components/rooms/GameRoom";
+import Bedroom from "@/components/rooms/Bedroom";
+import Shop from "@/components/rooms/Shop";
 import { usePetState } from "@/hooks/usePetState";
+import { useRoomNavigation } from "@/hooks/useRoomNavigation";
 
 const Index = () => {
   const { petState, isInteracting, interactionType, recentEarning, actions } = usePetState();
+  const { currentRoom, navigateToRoom } = useRoomNavigation();
+
+  const renderRoom = () => {
+    const commonProps = {
+      happiness: petState.happiness,
+      hunger: petState.hunger,
+      cleanliness: petState.cleanliness,
+      energy: petState.energy,
+      isInteracting,
+      interactionType,
+      disabled: isInteracting,
+    };
+
+    switch (currentRoom) {
+      case 'kitchen':
+        return <Kitchen {...commonProps} onFeed={actions.feed} />;
+      case 'bathroom':
+        return <Bathroom {...commonProps} onClean={actions.clean} />;
+      case 'game':
+        return <GameRoom {...commonProps} onPlay={actions.play} />;
+      case 'bedroom':
+        return <Bedroom {...commonProps} onSleep={actions.sleep} />;
+      case 'shop':
+        return <Shop coins={petState.coins} />;
+      default:
+        return <LivingRoom {...commonProps} />;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10">
-      <div className="container mx-auto max-w-md p-4 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10 flex flex-col">
+      <div className="container mx-auto max-w-md flex flex-col h-screen">
         {/* Header */}
-        <div className="text-center pt-4">
+        <div className="text-center pt-4 pb-2">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             My Virtual Pet
           </h1>
@@ -21,32 +54,11 @@ const Index = () => {
         {/* Coins */}
         <CoinDisplay coins={petState.coins} recentEarning={recentEarning} />
 
-        {/* Pet Display */}
-        <PetDisplay
-          happiness={petState.happiness}
-          hunger={petState.hunger}
-          cleanliness={petState.cleanliness}
-          energy={petState.energy}
-          isInteracting={isInteracting}
-          interactionType={interactionType}
-        />
+        {/* Current Room */}
+        {renderRoom()}
 
-        {/* Pet Stats */}
-        <PetStats
-          happiness={petState.happiness}
-          hunger={petState.hunger}
-          cleanliness={petState.cleanliness}
-          energy={petState.energy}
-        />
-
-        {/* Action Buttons */}
-        <ActionButtons
-          onFeed={actions.feed}
-          onClean={actions.clean}
-          onSleep={actions.sleep}
-          onPlay={actions.play}
-          disabled={isInteracting}
-        />
+        {/* Room Navigation */}
+        <RoomNavigation currentRoom={currentRoom} onNavigate={navigateToRoom} />
       </div>
     </div>
   );
