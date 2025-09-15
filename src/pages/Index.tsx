@@ -6,12 +6,25 @@ import Bathroom from "@/components/rooms/Bathroom";
 import GameRoom from "@/components/rooms/GameRoom";
 import Bedroom from "@/components/rooms/Bedroom";
 import Shop from "@/components/rooms/Shop";
-import { usePetState } from "@/hooks/usePetState";
+import { Header } from "@/components/Header";
+import { usePetStateWithAuth } from "@/hooks/usePetStateWithAuth";
 import { useRoomNavigation } from "@/hooks/useRoomNavigation";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
-  const { petState, isInteracting, interactionType, recentEarning, actions } = usePetState();
+  const { petState, isInteracting, interactionType, recentEarning, isLoading, actions } = usePetStateWithAuth();
   const { currentRoom, navigateToRoom } = useRoomNavigation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading your pet...</p>
+        </div>
+      </div>
+    );
+  }
 
   const renderRoom = () => {
     const commonProps = {
@@ -44,12 +57,10 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10 flex flex-col">
       <div className="container mx-auto max-w-md flex flex-col h-screen">
         {/* Header */}
-        <div className="text-center pt-4 pb-2">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            My Virtual Pet
-          </h1>
-          <p className="text-muted-foreground">Take care of your digital companion!</p>
-        </div>
+        <Header 
+          title="My Virtual Pet" 
+          subtitle="Take care of your digital companion!" 
+        />
 
         {/* Coins */}
         <CoinDisplay coins={petState.coins} recentEarning={recentEarning} />

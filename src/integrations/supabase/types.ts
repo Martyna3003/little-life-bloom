@@ -14,7 +14,64 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      users: {
+        Row: {
+          id: string
+          username: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          username: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          username?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      pet_data: {
+        Row: {
+          id: string
+          user_id: string
+          happiness: number
+          hunger: number
+          cleanliness: number
+          energy: number
+          coins: number
+          last_update_time: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          happiness?: number
+          hunger?: number
+          cleanliness?: number
+          energy?: number
+          coins?: number
+          last_update_time?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          happiness?: number
+          hunger?: number
+          cleanliness?: number
+          energy?: number
+          coins?: number
+          last_update_time?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
