@@ -51,8 +51,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const signUp = async (username: string, password: string) => {
+    // Create a valid email format using the username
+    const email = `${username}@petgame.local`;
+    
     const { error } = await supabase.auth.signUp({
-      email: `${username}@example.com`, // Using username as email for simplicity
+      email,
       password,
       options: {
         data: {
@@ -64,8 +67,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signIn = async (username: string, password: string) => {
+    // Create a valid email format using the username
+    const email = `${username}@petgame.local`;
+    
     const { error } = await supabase.auth.signInWithPassword({
-      email: `${username}@example.com`, // Using username as email for simplicity
+      email,
       password,
     });
     return { error };
