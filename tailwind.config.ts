@@ -47,6 +47,12 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        pet: {
+          happy: "hsl(var(--pet-happy))",
+          hungry: "hsl(var(--pet-hungry))",
+          tired: "hsl(var(--pet-tired))",
+          dirty: "hsl(var(--pet-dirty))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -80,10 +86,39 @@ export default {
             height: "0",
           },
         },
+        "bounce-gentle": {
+          "0%, 100%": {
+            transform: "translateY(0)",
+          },
+          "50%": {
+            transform: "translateY(-10px)",
+          },
+        },
+        "wiggle": {
+          "0%, 100%": { transform: "rotate(-3deg)" },
+          "50%": { transform: "rotate(3deg)" },
+        },
+        "pulse-gentle": {
+          "0%, 100%": {
+            opacity: "1",
+          },
+          "50%": {
+            opacity: "0.7",
+          },
+        },
+        "float": {
+          "0%, 100%": { transform: "translate(0, 0)" },
+          "33%": { transform: "translate(2px, -2px)" },
+          "66%": { transform: "translate(-2px, 2px)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "bounce-gentle": "bounce-gentle 2s infinite",
+        "wiggle": "wiggle 0.5s ease-in-out",
+        "pulse-gentle": "pulse-gentle 2s infinite",
+        "float": "float 3s ease-in-out infinite",
       },
     },
   },
