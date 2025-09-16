@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 const registerSchema = z.object({
+  email: z.string().email('Enter a valid email address'),
   username: z.string()
     .min(3, 'Username must be at least 3 characters')
     .max(20, 'Username must be less than 20 characters')
@@ -50,7 +51,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
     setSuccess(false);
 
     try {
-      const { error } = await signUp(data.username, data.password);
+      const { error } = await signUp(data.email, data.username, data.password);
       
       if (error) {
         if (error.message.includes('User already registered')) {
@@ -114,6 +115,20 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="your@email.com"
+              {...register('email')}
+              disabled={isLoading}
+            />
+            {errors.email && (
+              <p className="text-sm text-destructive">{errors.email.message}</p>
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>

@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (username: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, username: string, password: string) => Promise<{ error: any }>;
   signIn: (username: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
@@ -50,16 +50,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (username: string, password: string) => {
+  const signUp = async (email: string, username: string, password: string) => {
     const normalized = username.trim().toLowerCase();
     const isValid = /^[a-z0-9_]{3,20}$/.test(normalized);
     if (!isValid) {
       return { error: { message: 'Invalid username. Use 3-20 chars: a-z, 0-9, _' } };
     }
-
-    // Use a configurable domain to satisfy email domain allowlist/validation
-    const domain = (import.meta as any).env?.VITE_AUTH_FAKE_EMAIL_DOMAIN || 'petgame.dev';
-    const email = `${normalized}@${domain}`;
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -75,11 +71,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signIn = async (username: string, password: string) => {
     const normalized = username.trim().toLowerCase();
-    const domain = (import.meta as any).env?.VITE_AUTH_FAKE_EMAIL_DOMAIN || 'petgame.dev';
-    const email = `${normalized}@${domain}`;
+
+    // Resolve email by username via RPC
+    const { data: resolvedEmail, error: rpcError } = await supabase.rpc('get_email_by_username', { p_username: normalized });
+    if (rpcError || !resolvedEmail) {
+      return { error: { message: 'Incorrect username or password' } };
+    }
 
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: resolvedEmail,
       password,
     });
     return { error };

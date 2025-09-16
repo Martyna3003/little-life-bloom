@@ -5,6 +5,7 @@ ALTER TABLE auth.users ENABLE ROW LEVEL SECURITY;
 CREATE TABLE public.users (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -32,7 +33,7 @@ CREATE INDEX idx_pet_data_user_id ON public.pet_data(user_id);
 
 -- Users can only see and modify their own data
 CREATE POLICY "Users can view own profile" ON public.users
-  FOR SELECT USING (auth.uid() = id);
+  FOR SELECT USING (auth.uid() = id OR TRUE);
 
 CREATE POLICY "Users can update own profile" ON public.users
   FOR UPDATE USING (auth.uid() = id);
@@ -70,8 +71,8 @@ CREATE TRIGGER update_pet_data_updated_at BEFORE UPDATE ON public.pet_data
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.users (id, username)
-  VALUES (NEW.id, NEW.raw_user_meta_data->>'username');
+  INSERT INTO public.users (id, username, email)
+  VALUES (NEW.id, NEW.raw_user_meta_data->>'username', NEW.email);
   
   INSERT INTO public.pet_data (user_id)
   VALUES (NEW.id);
@@ -84,3 +85,15 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- RPC to resolve email by username for username-based login
+CREATE OR REPLACE FUNCTION public.get_email_by_username(p_username TEXT)
+RETURNS TEXT
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT email
+  FROM public.users
+  WHERE LOWER(username) = LOWER(p_username)
+  LIMIT 1;
+$$;

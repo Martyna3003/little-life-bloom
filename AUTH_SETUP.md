@@ -27,7 +27,7 @@ After running the schema, you should see these tables in your Supabase dashboard
 ## Features Implemented
 
 ### Authentication System
-- **Registration**: Simple username/password registration
+- **Registration**: Email + username + password (email stored in `public.users`)
 - **Login**: Username/password authentication
 - **Session Management**: Automatic session persistence
 - **Logout**: Secure sign out functionality
@@ -46,7 +46,7 @@ After running the schema, you should see these tables in your Supabase dashboard
 
 ## How It Works
 
-1. **Registration**: Users create an account with username and password
+1. **Registration**: Users create an account with email + username + password
 2. **Login**: Users sign in with their credentials
 3. **Data Sync**: Pet state is automatically saved to the database
 4. **Persistence**: Users can access their pet from any device
@@ -58,6 +58,13 @@ After running the schema, you should see these tables in your Supabase dashboard
 - Row Level Security ensures users can only access their own data
 - Session tokens are automatically managed
 - All database operations are authenticated
+
+## Email confirmation (recommended)
+
+For MVP you can keep email confirmation OFF to simplify onboarding. If you enable confirmations later:
+- Turn ON: Authentication → Providers → Email → Email confirmations
+- Configure SMTP so users receive confirmation emails
+- Login will require confirmed emails
 
 ## Testing the System
 

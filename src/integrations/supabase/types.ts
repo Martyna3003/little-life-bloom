@@ -18,18 +18,21 @@ export type Database = {
         Row: {
           id: string
           username: string
+          email: string
           created_at: string
           updated_at: string
         }
         Insert: {
           id: string
           username: string
+          email: string
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           username?: string
+          email?: string
           created_at?: string
           updated_at?: string
         }
@@ -77,7 +80,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_email_by_username: {
+        Args: { p_username: string }
+        Returns: string | null
+      }
     }
     Enums: {
       [_ in never]: never
