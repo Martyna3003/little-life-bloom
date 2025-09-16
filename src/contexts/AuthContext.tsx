@@ -51,15 +51,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const signUp = async (username: string, password: string) => {
-    // Create a valid email format using the username
-    const email = `${username}@petgame.local`;
-    
+    const normalized = username.trim().toLowerCase();
+    const isValid = /^[a-z0-9_]{3,20}$/.test(normalized);
+    if (!isValid) {
+      return { error: { message: 'Invalid username. Use 3-20 chars: a-z, 0-9, _' } };
+    }
+
+    // Use a standard TLD to satisfy email format validation
+    const email = `${normalized}@petgame.dev`;
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          username: username,
+          username: normalized,
         },
       },
     });
@@ -67,9 +73,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signIn = async (username: string, password: string) => {
-    // Create a valid email format using the username
-    const email = `${username}@petgame.local`;
-    
+    const normalized = username.trim().toLowerCase();
+    const email = `${normalized}@petgame.dev`;
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
