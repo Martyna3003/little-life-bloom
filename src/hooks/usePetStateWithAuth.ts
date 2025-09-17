@@ -96,15 +96,15 @@ export const usePetStateWithAuth = () => {
       try {
         const { error } = await supabase
           .from('pet_data')
-          .upsert({
-            user_id: user.id,
+          .update({
             happiness: newState.happiness,
             hunger: newState.hunger,
             cleanliness: newState.cleanliness,
             energy: newState.energy,
             coins: newState.coins,
             last_update_time: new Date(newState.lastUpdateTime).toISOString(),
-          });
+          })
+          .eq('user_id', user.id);
 
         if (error) {
           console.error('Error saving pet data:', error);
