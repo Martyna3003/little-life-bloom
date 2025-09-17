@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { AppError, handleError, handleSupabaseError, getUserFriendlyMessage } from "@/utils/errorHandler";
 
 interface PetState {
   happiness: number;
@@ -35,11 +36,13 @@ export const usePetStateWithAuth = () => {
   const [interactionType, setInteractionType] = useState<string>("");
   const [recentEarning, setRecentEarning] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<AppError | null>(null);
 
   // Load pet data from database or localStorage
   useEffect(() => {
     const loadPetData = async () => {
       setIsLoading(true);
+      setError(null);
       
       if (user) {
         // Load from database
@@ -51,7 +54,10 @@ export const usePetStateWithAuth = () => {
             .single();
 
           if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-            console.error('Error loading pet data:', error);
+            const appError = handleSupabaseError(error, 'loadPetData');
+            setError(appError);
+            console.error('Error loading pet data:', appError);
+            
             // Fallback to localStorage
             const saved = localStorage.getItem("petState");
             if (saved) {
@@ -68,7 +74,10 @@ export const usePetStateWithAuth = () => {
             });
           }
         } catch (err) {
-          console.error('Error loading pet data:', err);
+          const appError = handleError(err, 'loadPetData');
+          setError(appError);
+          console.error('Error loading pet data:', appError);
+          
           // Fallback to localStorage
           const saved = localStorage.getItem("petState");
           if (saved) {
@@ -107,10 +116,17 @@ export const usePetStateWithAuth = () => {
           .eq('user_id', user.id);
 
         if (error) {
-          console.error('Error saving pet data:', error);
+          const appError = handleSupabaseError(error, 'savePetData');
+          setError(appError);
+          console.error('Error saving pet data:', appError);
+        } else {
+          // Clear error on successful save
+          setError(null);
         }
       } catch (err) {
-        console.error('Error saving pet data:', err);
+        const appError = handleError(err, 'savePetData');
+        setError(appError);
+        console.error('Error saving pet data:', appError);
       }
     }
     
@@ -220,6 +236,8 @@ export const usePetStateWithAuth = () => {
     interactionType,
     recentEarning,
     isLoading,
+    error,
+    errorMessage: error ? getUserFriendlyMessage(error) : null,
     actions: {
       feed,
       clean,

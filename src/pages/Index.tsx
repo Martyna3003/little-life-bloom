@@ -12,7 +12,7 @@ import { useRoomNavigation } from "@/hooks/useRoomNavigation";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
-  const { petState, isInteracting, interactionType, recentEarning, isLoading, actions } = usePetStateWithAuth();
+  const { petState, isInteracting, interactionType, recentEarning, isLoading, error, errorMessage, actions } = usePetStateWithAuth();
   const { currentRoom, navigateToRoom } = useRoomNavigation();
 
   if (isLoading) {
@@ -61,6 +61,23 @@ const Index = () => {
           title="My Virtual Pet" 
           subtitle="Take care of your digital companion!" 
         />
+
+        {/* Error Display */}
+        {error && (
+          <div className="mx-4 mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-destructive rounded-full"></div>
+              <p className="text-sm text-destructive font-medium">
+                {errorMessage}
+              </p>
+            </div>
+            {error.severity === 'high' && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Kod błędu: {error.code}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Coins */}
         <CoinDisplay coins={petState.coins} recentEarning={recentEarning} />
