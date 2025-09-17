@@ -103,6 +103,7 @@ export const usePetStateWithAuth = () => {
     if (user) {
       // Save to database
       try {
+        console.log('Attempting to save pet data to database...');
         const { error } = await supabase
           .from('pet_data')
           .update({
@@ -116,14 +117,17 @@ export const usePetStateWithAuth = () => {
           .eq('user_id', user.id);
 
         if (error) {
+          console.log('Supabase returned error:', error);
           const appError = handleSupabaseError(error, 'savePetData');
           setError(appError);
           console.error('Error saving pet data:', appError);
         } else {
+          console.log('Successfully saved to database');
           // Clear error on successful save
           setError(null);
         }
       } catch (err) {
+        console.log('Caught exception during save:', err);
         const appError = handleError(err, 'savePetData');
         setError(appError);
         console.error('Error saving pet data:', appError);
