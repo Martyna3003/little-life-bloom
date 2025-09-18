@@ -184,10 +184,13 @@ export const usePetStateWithAuth = () => {
   // Setup batch processor
   useEffect(() => {
     batchUpdates.setBatchProcessor(async (updates) => {
+      console.log('Processing batch:', updates.length, 'updates');
       if (user && updates.length > 0) {
         // Use the latest update
         const latestUpdate = updates[updates.length - 1];
+        console.log('Saving latest update:', latestUpdate.data);
         await savePetDataToDatabase(latestUpdate.data);
+        console.log('Batch processed successfully');
       }
     });
   }, [user, batchUpdates]);
@@ -195,10 +198,18 @@ export const usePetStateWithAuth = () => {
   // Save state with debounce and batching
   useEffect(() => {
     if (!isLoading && debouncedPetState !== petState) {
+      console.log('Adding to batch:', debouncedPetState);
       // Add to batch for processing
       batchUpdates.addToBatch('pet-state', debouncedPetState);
     }
   }, [debouncedPetState, isLoading, batchUpdates, petState]);
+
+  // Clear pending updates when they're processed
+  useEffect(() => {
+    if (batchUpdates.pendingUpdates === 0) {
+      // Updates have been processed
+    }
+  }, [batchUpdates.pendingUpdates]);
 
   // Automatic decay over time
   useEffect(() => {
@@ -228,47 +239,37 @@ export const usePetStateWithAuth = () => {
     setInteractionType(type);
     
     // Optimistic update - show change immediately
-    optimisticUpdate.updateOptimistically(
-      (currentState) => {
-        const newState = {
-          ...currentState,
-          ...updates,
-          happiness: Math.min(100, Math.max(0, (updates.happiness ?? currentState.happiness))),
-          hunger: Math.min(100, Math.max(0, (updates.hunger ?? currentState.hunger))),
-          cleanliness: Math.min(100, Math.max(0, (updates.cleanliness ?? currentState.cleanliness))),
-          energy: Math.min(100, Math.max(0, (updates.energy ?? currentState.energy))),
-          coins: Math.max(0, (updates.coins ?? currentState.coins)),
-          lastUpdateTime: Date.now(),
-        };
+    setPetState(prev => {
+      const newState = {
+        ...prev,
+        ...updates,
+        happiness: Math.min(100, Math.max(0, (updates.happiness ?? prev.happiness))),
+        hunger: Math.min(100, Math.max(0, (updates.hunger ?? prev.hunger))),
+        cleanliness: Math.min(100, Math.max(0, (updates.cleanliness ?? prev.cleanliness))),
+        energy: Math.min(100, Math.max(0, (updates.energy ?? prev.energy))),
+        coins: Math.max(0, (updates.coins ?? prev.coins)),
+        lastUpdateTime: Date.now(),
+      };
 
-        // Calculate coin reward based on action effectiveness
-        const avgStat = (newState.happiness + (100 - newState.hunger) + newState.cleanliness + newState.energy) / 4;
+      // Calculate coin reward based on action effectiveness
+      const avgStat = (newState.happiness + (100 - newState.hunger) + newState.cleanliness + newState.energy) / 4;
+      
+      if (avgStat > 70) {
+        const coinReward = Math.floor(Math.random() * 3) + 1;
+        setRecentEarning(coinReward);
+        newState.coins += coinReward;
         
-        if (avgStat > 70) {
-          const coinReward = Math.floor(Math.random() * 3) + 1;
-          setRecentEarning(coinReward);
-          newState.coins += coinReward;
-          
-          setTimeout(() => setRecentEarning(0), 2000);
-        }
-
-        return newState;
-      },
-      async () => {
-        // This will be called in the background
-        // The optimistic update already shows the change
-        return optimisticUpdate.data;
+        setTimeout(() => setRecentEarning(0), 2000);
       }
-    );
 
-    // Update local state for immediate UI feedback
-    setPetState(optimisticUpdate.data);
+      return newState;
+    });
 
     setTimeout(() => {
       setIsInteracting(false);
       setInteractionType("");
     }, 1500);
-  }, [optimisticUpdate]);
+  }, []);
 
   const feed = useCallback(() => {
     performAction("feed", {
@@ -301,14 +302,14 @@ export const usePetStateWithAuth = () => {
   }, [petState, performAction]);
 
   return {
-    petState: optimisticUpdate.data,
+    petState,
     isInteracting,
     interactionType,
     recentEarning,
     isLoading,
     error,
     errorMessage: error ? getUserFriendlyMessage(error) : null,
-    isUpdating: optimisticUpdate.isUpdating,
+    isUpdating: batchUpdates.pendingUpdates > 0,
     pendingUpdates: batchUpdates.pendingUpdates,
     actions: {
       feed,
