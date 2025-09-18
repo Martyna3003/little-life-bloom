@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { validateUserData } from '@/utils/validation';
 
 const registerSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -51,6 +52,14 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
     setSuccess(false);
 
     try {
+      // Additional validation before submission
+      const validation = validateUserData(data);
+      if (!validation.isValid) {
+        setError(validation.errors.join('. '));
+        setIsLoading(false);
+        return;
+      }
+
       const { error } = await signUp(data.email, data.username, data.password);
       
       if (error) {

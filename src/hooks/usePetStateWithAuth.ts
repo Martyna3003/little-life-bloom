@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AppError, handleError, handleSupabaseError, getUserFriendlyMessage } from "@/utils/errorHandler";
+import { validatePetState, validateBeforeSave, logValidationErrors } from "@/utils/validation";
 
 interface PetState {
   happiness: number;
@@ -64,7 +65,8 @@ export const usePetStateWithAuth = () => {
               setPetState(JSON.parse(saved));
             }
           } else if (data) {
-            setPetState({
+            // Validate data from database
+            const validation = validatePetState({
               happiness: data.happiness,
               hunger: data.hunger,
               cleanliness: data.cleanliness,
@@ -72,6 +74,16 @@ export const usePetStateWithAuth = () => {
               coins: data.coins,
               lastUpdateTime: new Date(data.last_update_time).getTime(),
             });
+
+            if (validation.isValid && validation.sanitizedData) {
+              setPetState(validation.sanitizedData);
+            } else {
+              logValidationErrors(validation.errors, 'loadPetData');
+              // Use sanitized data even if there were validation warnings
+              if (validation.sanitizedData) {
+                setPetState(validation.sanitizedData);
+              }
+            }
           }
         } catch (err) {
           const appError = handleError(err, 'loadPetData');
@@ -100,6 +112,24 @@ export const usePetStateWithAuth = () => {
 
   // Save pet data to database or localStorage
   const savePetData = useCallback(async (newState: PetState) => {
+    // Validate data before saving
+    const validation = validateBeforeSave(newState, 'pet');
+    
+    if (!validation.isValid) {
+      logValidationErrors(validation.errors, 'savePetData');
+      const appError = new AppError(
+        'Nieprawidłowe dane zwierzątka',
+        'VALIDATION_ERROR',
+        'medium',
+        { validationErrors: validation.errors }
+      );
+      setError(appError);
+      return;
+    }
+
+    // Use sanitized data
+    const sanitizedState = validation.sanitizedData || newState;
+
     if (user) {
       // Save to database
       try {
@@ -107,12 +137,12 @@ export const usePetStateWithAuth = () => {
         const { error } = await supabase
           .from('pet_data')
           .update({
-            happiness: newState.happiness,
-            hunger: newState.hunger,
-            cleanliness: newState.cleanliness,
-            energy: newState.energy,
-            coins: newState.coins,
-            last_update_time: new Date(newState.lastUpdateTime).toISOString(),
+            happiness: sanitizedState.happiness,
+            hunger: sanitizedState.hunger,
+            cleanliness: sanitizedState.cleanliness,
+            energy: sanitizedState.energy,
+            coins: sanitizedState.coins,
+            last_update_time: new Date(sanitizedState.lastUpdateTime).toISOString(),
           })
           .eq('user_id', user.id);
 
@@ -134,8 +164,8 @@ export const usePetStateWithAuth = () => {
       }
     }
     
-    // Always save to localStorage as backup
-    localStorage.setItem("petState", JSON.stringify(newState));
+    // Always save sanitized data to localStorage as backup
+    localStorage.setItem("petState", JSON.stringify(sanitizedState));
   }, [user]);
 
   // Save state whenever it changes

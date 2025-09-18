@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { validateUserData, logValidationErrors } from '@/utils/validation';
 
 interface AuthContextType {
   user: User | null;
@@ -51,18 +52,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const signUp = async (email: string, username: string, password: string) => {
-    const normalized = username.trim().toLowerCase();
-    const isValid = /^[a-z0-9_]{3,20}$/.test(normalized);
-    if (!isValid) {
-      return { error: { message: 'Invalid username. Use 3-20 chars: a-z, 0-9, _' } };
+    // Validate user data
+    const validation = validateUserData({ email, username, password });
+    
+    if (!validation.isValid) {
+      logValidationErrors(validation.errors, 'signUp');
+      return { 
+        error: { 
+          message: validation.errors.join('. ') 
+        } 
+      };
     }
 
+    const sanitizedData = validation.sanitizedData!;
+    
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email: sanitizedData.email,
+      password: sanitizedData.password!,
       options: {
         data: {
-          username: normalized,
+          username: sanitizedData.username,
         },
       },
     });
@@ -70,7 +79,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signIn = async (username: string, password: string) => {
-    const normalized = username.trim().toLowerCase();
+    // Validate username format
+    const validation = validateUserData({ username, email: 'dummy@example.com' });
+    
+    if (!validation.isValid) {
+      logValidationErrors(validation.errors, 'signIn');
+      return { 
+        error: { 
+          message: 'Nieprawidłowy format username' 
+        } 
+      };
+    }
+
+    const normalized = validation.sanitizedData!.username;
 
     // Resolve email by username via RPC
     const { data: resolvedEmail, error: rpcError } = await supabase.rpc('get_email_by_username', { p_username: normalized });
