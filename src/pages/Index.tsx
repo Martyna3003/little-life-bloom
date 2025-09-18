@@ -12,7 +12,7 @@ import { useRoomNavigation } from "@/hooks/useRoomNavigation";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
-  const { petState, isInteracting, interactionType, recentEarning, isLoading, error, errorMessage, actions } = usePetStateWithAuth();
+  const { petState, isInteracting, interactionType, recentEarning, isLoading, error, errorMessage, isUpdating, pendingUpdates, actions } = usePetStateWithAuth();
   const { currentRoom, navigateToRoom } = useRoomNavigation();
 
   if (isLoading) {
@@ -76,6 +76,18 @@ const Index = () => {
                 Kod błędu: {error.code}
               </p>
             )}
+          </div>
+        )}
+
+        {/* Performance Indicators */}
+        {(isUpdating || pendingUpdates > 0) && (
+          <div className="mx-4 mb-4 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
+              <p className="text-xs text-blue-600">
+                {isUpdating ? 'Synchronizacja danych...' : `Oczekuje ${pendingUpdates} aktualizacji`}
+              </p>
+            </div>
           </div>
         )}
 

@@ -3,6 +3,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AppError, handleError, handleSupabaseError, getUserFriendlyMessage } from "@/utils/errorHandler";
 import { validatePetState, validateBeforeSave, logValidationErrors } from "@/utils/validation";
+import { useDebounce } from "./useDebounce";
+import { useOptimisticUpdate } from "./useOptimisticUpdate";
+import { useBatchUpdates } from "./useBatchUpdates";
 
 interface PetState {
   happiness: number;
@@ -38,6 +41,11 @@ export const usePetStateWithAuth = () => {
   const [recentEarning, setRecentEarning] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<AppError | null>(null);
+
+  // Performance optimizations
+  const debouncedPetState = useDebounce(petState, 500); // Debounce for 500ms
+  const optimisticUpdate = useOptimisticUpdate(petState);
+  const batchUpdates = useBatchUpdates<PetState>(3, 1000); // Batch 3 updates, max 1s delay
 
   // Load pet data from database or localStorage
   useEffect(() => {
@@ -110,8 +118,8 @@ export const usePetStateWithAuth = () => {
     loadPetData();
   }, [user]);
 
-  // Save pet data to database or localStorage
-  const savePetData = useCallback(async (newState: PetState) => {
+  // Save pet data to database (optimized version)
+  const savePetDataToDatabase = useCallback(async (newState: PetState) => {
     // Validate data before saving
     const validation = validateBeforeSave(newState, 'pet');
     
@@ -168,12 +176,29 @@ export const usePetStateWithAuth = () => {
     localStorage.setItem("petState", JSON.stringify(sanitizedState));
   }, [user]);
 
-  // Save state whenever it changes
+  // Legacy savePetData for backward compatibility
+  const savePetData = useCallback(async (newState: PetState) => {
+    await savePetDataToDatabase(newState);
+  }, [savePetDataToDatabase]);
+
+  // Setup batch processor
   useEffect(() => {
-    if (!isLoading) {
-      savePetData(petState);
+    batchUpdates.setBatchProcessor(async (updates) => {
+      if (user && updates.length > 0) {
+        // Use the latest update
+        const latestUpdate = updates[updates.length - 1];
+        await savePetDataToDatabase(latestUpdate.data);
+      }
+    });
+  }, [user, batchUpdates]);
+
+  // Save state with debounce and batching
+  useEffect(() => {
+    if (!isLoading && debouncedPetState !== petState) {
+      // Add to batch for processing
+      batchUpdates.addToBatch('pet-state', debouncedPetState);
     }
-  }, [petState, savePetData, isLoading]);
+  }, [debouncedPetState, isLoading, batchUpdates, petState]);
 
   // Automatic decay over time
   useEffect(() => {
@@ -202,37 +227,48 @@ export const usePetStateWithAuth = () => {
     setIsInteracting(true);
     setInteractionType(type);
     
-    setPetState(prev => {
-      const newState = {
-        ...prev,
-        ...updates,
-        happiness: Math.min(100, Math.max(0, (updates.happiness ?? prev.happiness))),
-        hunger: Math.min(100, Math.max(0, (updates.hunger ?? prev.hunger))),
-        cleanliness: Math.min(100, Math.max(0, (updates.cleanliness ?? prev.cleanliness))),
-        energy: Math.min(100, Math.max(0, (updates.energy ?? prev.energy))),
-        coins: Math.max(0, (updates.coins ?? prev.coins)),
-        lastUpdateTime: Date.now(),
-      };
+    // Optimistic update - show change immediately
+    optimisticUpdate.updateOptimistically(
+      (currentState) => {
+        const newState = {
+          ...currentState,
+          ...updates,
+          happiness: Math.min(100, Math.max(0, (updates.happiness ?? currentState.happiness))),
+          hunger: Math.min(100, Math.max(0, (updates.hunger ?? currentState.hunger))),
+          cleanliness: Math.min(100, Math.max(0, (updates.cleanliness ?? currentState.cleanliness))),
+          energy: Math.min(100, Math.max(0, (updates.energy ?? currentState.energy))),
+          coins: Math.max(0, (updates.coins ?? currentState.coins)),
+          lastUpdateTime: Date.now(),
+        };
 
-      // Calculate coin reward based on action effectiveness
-      const avgStat = (newState.happiness + (100 - newState.hunger) + newState.cleanliness + newState.energy) / 4;
-      
-      if (avgStat > 70) {
-        const coinReward = Math.floor(Math.random() * 3) + 1;
-        setRecentEarning(coinReward);
-        newState.coins += coinReward;
+        // Calculate coin reward based on action effectiveness
+        const avgStat = (newState.happiness + (100 - newState.hunger) + newState.cleanliness + newState.energy) / 4;
         
-        setTimeout(() => setRecentEarning(0), 2000);
-      }
+        if (avgStat > 70) {
+          const coinReward = Math.floor(Math.random() * 3) + 1;
+          setRecentEarning(coinReward);
+          newState.coins += coinReward;
+          
+          setTimeout(() => setRecentEarning(0), 2000);
+        }
 
-      return newState;
-    });
+        return newState;
+      },
+      async () => {
+        // This will be called in the background
+        // The optimistic update already shows the change
+        return optimisticUpdate.data;
+      }
+    );
+
+    // Update local state for immediate UI feedback
+    setPetState(optimisticUpdate.data);
 
     setTimeout(() => {
       setIsInteracting(false);
       setInteractionType("");
     }, 1500);
-  }, []);
+  }, [optimisticUpdate]);
 
   const feed = useCallback(() => {
     performAction("feed", {
@@ -265,13 +301,15 @@ export const usePetStateWithAuth = () => {
   }, [petState, performAction]);
 
   return {
-    petState,
+    petState: optimisticUpdate.data,
     isInteracting,
     interactionType,
     recentEarning,
     isLoading,
     error,
     errorMessage: error ? getUserFriendlyMessage(error) : null,
+    isUpdating: optimisticUpdate.isUpdating,
+    pendingUpdates: batchUpdates.pendingUpdates,
     actions: {
       feed,
       clean,
