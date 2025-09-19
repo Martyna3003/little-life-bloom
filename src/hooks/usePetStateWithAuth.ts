@@ -623,28 +623,15 @@ export const usePetStateWithAuth = () => {
         return false;
       }
 
-      // Check if user already owns this item (simplified check)
+      // Check if user already owns this item (using localStorage)
       console.log('Checking if user already owns item...');
-      try {
-        const { data: ownedData, error: ownedError } = await supabase
-          .from('purchased_items')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('item_id', itemId)
-          .single();
-
-        if (ownedData) {
-          setError(new AppError('Już posiadasz ten przedmiot', 'ITEM_ALREADY_OWNED', 'medium'));
-          return false;
-        }
-        
-        if (ownedError && ownedError.code !== 'PGRST116') { // PGRST116 = no rows returned
-          console.log('Error checking owned items (non-critical):', ownedError);
-          // Continue with purchase - this is not a critical error
-        }
-      } catch (err) {
-        console.log('Exception checking owned items (non-critical):', err);
-        // Continue with purchase - this is not a critical error
+      const localPurchased = localStorage.getItem(`purchased_items_${user.id}`);
+      const currentPurchased = localPurchased ? JSON.parse(localPurchased) : [];
+      const alreadyOwned = currentPurchased.some((item: any) => item.item_id === itemId);
+      
+      if (alreadyOwned) {
+        setError(new AppError('Już posiadasz ten przedmiot', 'ITEM_ALREADY_OWNED', 'medium'));
+        return false;
       }
 
       // Check if user has enough coins
