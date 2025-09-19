@@ -26,6 +26,7 @@ const Index = () => {
     shopItems, 
     purchasedItems, 
     isLoadingShop, 
+    debugShopItems,
     actions 
   } = usePetStateWithAuth();
   const { currentRoom, navigateToRoom } = useRoomNavigation();
@@ -69,6 +70,7 @@ const Index = () => {
           purchasedItems={purchasedItems}
           isLoading={isLoadingShop}
           onPurchase={actions.purchaseItem}
+          onDebug={debugShopItems}
         />;
       default:
         return <LivingRoom {...commonProps} />;

@@ -25,9 +25,10 @@ interface ShopProps {
   purchasedItems: PurchasedItem[];
   isLoading: boolean;
   onPurchase?: (itemId: string) => Promise<boolean>;
+  onDebug?: () => void;
 }
 
-const Shop = ({ coins, shopItems, purchasedItems, isLoading, onPurchase }: ShopProps) => {
+const Shop = ({ coins, shopItems, purchasedItems, isLoading, onPurchase, onDebug }: ShopProps) => {
   const handlePurchase = async (item: ShopItem) => {
     if (coins >= item.cost && onPurchase) {
       await onPurchase(item.item_id);
@@ -43,6 +44,16 @@ const Shop = ({ coins, shopItems, purchasedItems, isLoading, onPurchase }: ShopP
       <div className="text-center">
         <h2 className="text-2xl font-bold text-foreground mb-2">Shop</h2>
         <p className="text-muted-foreground text-sm">Spend your coins on cool items!</p>
+        {onDebug && (
+          <Button 
+            onClick={onDebug} 
+            variant="outline" 
+            size="sm" 
+            className="mt-2"
+          >
+            Debug Shop ({shopItems.length} items)
+          </Button>
+        )}
       </div>
 
       <div className="bg-gradient-to-r from-yellow-400/20 to-orange-400/20 rounded-2xl p-4 border-2 border-white/30">

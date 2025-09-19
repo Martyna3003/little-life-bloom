@@ -165,11 +165,58 @@ export const usePetStateWithAuth = () => {
           if (!data || data.length === 0) {
             console.log('No shop items found, attempting to initialize...');
             try {
+              // Try RPC function first
               const { error: initError } = await supabase.rpc('initialize_shop_items');
               if (initError) {
-                console.error('Error initializing shop items:', initError);
+                console.error('RPC function failed, trying manual initialization:', initError);
+                
+                // Fallback: manual initialization
+                const shopItemsData = [
+                  { item_id: 'hat', name: 'Party Hat', emoji: '🎩', cost: 15, description: 'A stylish hat for your pet', category: 'accessories' },
+                  { item_id: 'bow', name: 'Bow Tie', emoji: '🎀', cost: 12, description: 'Elegant bow tie', category: 'accessories' },
+                  { item_id: 'sunglasses', name: 'Cool Shades', emoji: '🕶️', cost: 20, description: 'Super cool sunglasses', category: 'accessories' },
+                  { item_id: 'background_beach', name: 'Beach Scene', emoji: '🏖️', cost: 25, description: 'Tropical background', category: 'backgrounds' },
+                  { item_id: 'crown', name: 'Royal Crown', emoji: '👑', cost: 50, description: 'Fit for a royal pet', category: 'accessories' },
+                  { item_id: 'scarf', name: 'Cozy Scarf', emoji: '🧣', cost: 18, description: 'Warm and stylish', category: 'accessories' },
+                  { item_id: 'background_space', name: 'Space Scene', emoji: '🚀', cost: 30, description: 'Out of this world!', category: 'backgrounds' },
+                  { item_id: 'background_forest', name: 'Forest Scene', emoji: '🌲', cost: 22, description: 'Nature background', category: 'backgrounds' }
+                ];
+
+                // Insert items one by one
+                for (const item of shopItemsData) {
+                  const { error: insertError } = await supabase
+                    .from('shop_items')
+                    .insert({
+                      item_id: item.item_id,
+                      name: item.name,
+                      emoji: item.emoji,
+                      cost: item.cost,
+                      description: item.description,
+                      category: item.category,
+                      is_active: true
+                    });
+                  
+                  if (insertError) {
+                    console.error('Error inserting item:', item.item_id, insertError);
+                  } else {
+                    console.log('Successfully inserted item:', item.item_id);
+                  }
+                }
+
+                // Reload shop items after manual initialization
+                const { data: newData, error: reloadError } = await supabase
+                  .from('shop_items')
+                  .select('*')
+                  .eq('is_active', true)
+                  .order('category', { ascending: true })
+                  .order('cost', { ascending: true });
+                
+                if (!reloadError && newData) {
+                  console.log('Reloaded shop items after manual init:', newData.length, 'items');
+                  setShopItems(newData);
+                }
               } else {
-                console.log('Shop items initialized successfully');
+                console.log('Shop items initialized successfully via RPC');
                 // Reload shop items after initialization
                 const { data: newData, error: reloadError } = await supabase
                   .from('shop_items')
@@ -469,6 +516,7 @@ export const usePetStateWithAuth = () => {
       }
 
       // Try to use the RPC function first
+      console.log('Attempting to call purchase_item RPC function...');
       const { data, error } = await supabase.rpc('purchase_item', {
         p_item_id: itemId
       });
@@ -476,12 +524,13 @@ export const usePetStateWithAuth = () => {
       console.log('Purchase response:', { data, error });
 
       if (error) {
-        console.log('RPC function failed, trying manual purchase...');
+        console.log('RPC function failed, trying manual purchase...', error);
         
         // Fallback: manual purchase
         const newCoins = petState.coins - itemData.cost;
         
         // Update coins
+        console.log('Updating coins from', petState.coins, 'to', newCoins);
         const { error: updateError } = await supabase
           .from('pet_data')
           .update({ 
@@ -498,6 +547,7 @@ export const usePetStateWithAuth = () => {
         }
 
         // Add purchased item
+        console.log('Adding purchased item:', itemId, 'for user:', user.id);
         const { error: purchaseError } = await supabase
           .from('purchased_items')
           .insert({
@@ -521,6 +571,7 @@ export const usePetStateWithAuth = () => {
         }));
 
         // Reload purchased items
+        console.log('Reloading purchased items...');
         const { data: newPurchasedItems, error: reloadError } = await supabase
           .from('purchased_items')
           .select(`
@@ -530,14 +581,17 @@ export const usePetStateWithAuth = () => {
           .eq('user_id', user.id);
 
         if (!reloadError && newPurchasedItems) {
+          console.log('Reloaded purchased items:', newPurchasedItems.length, 'items');
           setPurchasedItems(newPurchasedItems);
+        } else if (reloadError) {
+          console.error('Error reloading purchased items:', reloadError);
         }
 
         return true;
       }
 
       if (data && data.success) {
-        console.log('Purchase successful, updating coins to:', data.remaining_coins);
+        console.log('Purchase successful via RPC, updating coins to:', data.remaining_coins);
         // Update pet state with new coin amount
         setPetState(prev => ({
           ...prev,
@@ -546,6 +600,7 @@ export const usePetStateWithAuth = () => {
         }));
 
         // Reload purchased items
+        console.log('Reloading purchased items after RPC purchase...');
         const { data: newPurchasedItems, error: reloadError } = await supabase
           .from('purchased_items')
           .select(`
@@ -555,12 +610,15 @@ export const usePetStateWithAuth = () => {
           .eq('user_id', user.id);
 
         if (!reloadError && newPurchasedItems) {
+          console.log('Reloaded purchased items after RPC:', newPurchasedItems.length, 'items');
           setPurchasedItems(newPurchasedItems);
+        } else if (reloadError) {
+          console.error('Error reloading purchased items after RPC:', reloadError);
         }
 
         return true;
       } else {
-        console.log('Purchase failed:', data?.error);
+        console.log('Purchase failed via RPC:', data?.error);
         setError(new AppError(data?.error || 'Nie udało się kupić przedmiotu', 'PURCHASE_FAILED', 'medium'));
         return false;
       }
@@ -570,9 +628,33 @@ export const usePetStateWithAuth = () => {
       console.error('Error purchasing item:', appError);
       return false;
     } finally {
+      console.log('Purchase process completed, setting loading to false');
       setIsLoadingShop(false);
     }
   }, [user]);
+
+  // Debug function to test shop items
+  const debugShopItems = useCallback(async () => {
+    console.log('=== DEBUG SHOP ITEMS ===');
+    console.log('Current shopItems:', shopItems);
+    console.log('ShopItems length:', shopItems.length);
+    console.log('User:', user ? 'authenticated' : 'not authenticated');
+    
+    if (user) {
+      console.log('Testing shop items query...');
+      const { data, error } = await supabase
+        .from('shop_items')
+        .select('*')
+        .eq('is_active', true);
+      
+      console.log('Direct query result:', { data, error });
+      
+      console.log('Testing RPC function...');
+      const { data: rpcData, error: rpcError } = await supabase.rpc('initialize_shop_items');
+      console.log('RPC result:', { rpcData, rpcError });
+    }
+    console.log('=== END DEBUG ===');
+  }, [shopItems, user]);
 
   return {
     petState,
@@ -588,6 +670,7 @@ export const usePetStateWithAuth = () => {
     shopItems,
     purchasedItems,
     isLoadingShop,
+    debugShopItems,
     actions: {
       feed,
       clean,

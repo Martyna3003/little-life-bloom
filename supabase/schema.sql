@@ -79,9 +79,12 @@ CREATE POLICY "Users can update own pet data" ON public.pet_data
 CREATE POLICY "Users can insert own pet data" ON public.pet_data
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Shop items policies (everyone can view, only admins can modify)
+-- Shop items policies (everyone can view, authenticated users can insert)
 CREATE POLICY "Anyone can view shop items" ON public.shop_items
   FOR SELECT USING (is_active = TRUE);
+
+CREATE POLICY "Authenticated users can insert shop items" ON public.shop_items
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 -- Purchased items policies
 CREATE POLICY "Users can view own purchased items" ON public.purchased_items
