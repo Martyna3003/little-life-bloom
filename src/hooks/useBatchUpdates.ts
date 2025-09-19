@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 
 export interface BatchUpdate<T> {
   id: string;
@@ -13,6 +13,7 @@ export function useBatchUpdates<T>(
   const batchRef = useRef<BatchUpdate<T>[]>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const onBatchProcess = useRef<((updates: BatchUpdate<T>[]) => Promise<void>) | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const addToBatch = useCallback((id: string, data: T) => {
     // Remove existing update with same id
@@ -53,12 +54,15 @@ export function useBatchUpdates<T>(
       timeoutRef.current = null;
     }
 
+    setIsUpdating(true);
     try {
       await onBatchProcess.current(updates);
     } catch (error) {
       console.error('Batch processing failed:', error);
       // Re-add failed updates to batch
       batchRef.current.unshift(...updates);
+    } finally {
+      setIsUpdating(false);
     }
   }, []);
 
@@ -80,5 +84,6 @@ export function useBatchUpdates<T>(
     setBatchProcessor,
     processBatch,
     pendingUpdates: batchRef.current.length,
+    isUpdating,
   };
 }

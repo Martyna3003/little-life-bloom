@@ -309,7 +309,7 @@ export const usePetStateWithAuth = () => {
     isLoading,
     error,
     errorMessage: error ? getUserFriendlyMessage(error) : null,
-    isUpdating: batchUpdates.pendingUpdates > 0,
+    isUpdating: batchUpdates.isUpdating,
     pendingUpdates: batchUpdates.pendingUpdates,
     actions: {
       feed,
