@@ -563,7 +563,13 @@ export const usePetStateWithAuth = () => {
   }, [petState, performAction]);
 
   const purchaseItem = useCallback(async (itemId: string) => {
+    console.log('🛒 PURCHASE STARTED for item:', itemId);
+    console.log('🛒 User:', user ? 'authenticated' : 'not authenticated');
+    console.log('🛒 Current coins:', petState.coins);
+    console.log('🛒 OFFLINE_MODE:', OFFLINE_MODE);
+    
     if (!user) {
+      console.log('🛒 ERROR: User not authenticated');
       setError(new AppError('Musisz być zalogowany, aby kupować przedmioty', 'AUTH_REQUIRED', 'medium'));
       return false;
     }
@@ -572,7 +578,7 @@ export const usePetStateWithAuth = () => {
     setError(null);
 
     try {
-      console.log('Attempting to purchase item:', itemId);
+      console.log('🛒 Attempting to purchase item:', itemId);
       
       if (OFFLINE_MODE) {
         console.log('OFFLINE MODE: Simulating purchase');
@@ -624,38 +630,43 @@ export const usePetStateWithAuth = () => {
       }
 
       // Check if user already owns this item (using localStorage)
-      console.log('Checking if user already owns item...');
+      console.log('🛒 Checking if user already owns item...');
       const localPurchased = localStorage.getItem(`purchased_items_${user.id}`);
       const currentPurchased = localPurchased ? JSON.parse(localPurchased) : [];
       const alreadyOwned = currentPurchased.some((item: any) => item.item_id === itemId);
+      console.log('🛒 Currently owned items:', currentPurchased.length);
+      console.log('🛒 Already owns this item?', alreadyOwned);
       
       if (alreadyOwned) {
+        console.log('🛒 ERROR: Already owns item');
         setError(new AppError('Już posiadasz ten przedmiot', 'ITEM_ALREADY_OWNED', 'medium'));
         return false;
       }
 
       // Check if user has enough coins
+      console.log('🛒 Checking coins:', petState.coins, 'vs cost:', itemData.cost);
       if (petState.coins < itemData.cost) {
+        console.log('🛒 ERROR: Insufficient coins');
         setError(new AppError('Nie masz wystarczająco monet', 'INSUFFICIENT_COINS', 'medium'));
         return false;
       }
 
       // Try to use the RPC function first
-      console.log('Attempting to call purchase_item RPC function...');
+      console.log('🛒 Attempting to call purchase_item RPC function...');
       const { data, error } = await supabase.rpc('purchase_item', {
         p_item_id: itemId
       });
 
-      console.log('Purchase response:', { data, error });
+      console.log('🛒 RPC Purchase response:', { data, error });
 
       if (error) {
-        console.log('RPC function failed, trying manual purchase...', error);
+        console.log('🛒 RPC function failed, trying manual purchase...', error);
         
         // Fallback: manual purchase
         const newCoins = petState.coins - itemData.cost;
         
         // Update coins
-        console.log('Updating coins from', petState.coins, 'to', newCoins);
+        console.log('🛒 MANUAL: Updating coins from', petState.coins, 'to', newCoins);
         const { error: updateError } = await supabase
           .from('pet_data')
           .update({ 
@@ -665,6 +676,7 @@ export const usePetStateWithAuth = () => {
           .eq('user_id', user.id);
 
         if (updateError) {
+          console.log('🛒 MANUAL: Error updating coins:', updateError);
           const appError = handleSupabaseError(updateError, 'purchaseItem');
           setError(appError);
           console.error('Error updating coins:', appError);
@@ -690,7 +702,7 @@ export const usePetStateWithAuth = () => {
         
         console.log('Purchase saved to localStorage successfully');
 
-        console.log('Manual purchase successful, updating coins to:', newCoins);
+        console.log('🛒 MANUAL: Purchase successful, updating coins to:', newCoins);
         // Update pet state with new coin amount
         setPetState(prev => ({
           ...prev,
@@ -699,11 +711,12 @@ export const usePetStateWithAuth = () => {
         }));
 
         // Update purchased items state from localStorage
-        console.log('Updating purchased items state...');
+        console.log('🛒 MANUAL: Updating purchased items state...');
         const localPurchasedData2 = localStorage.getItem(`purchased_items_${user.id}`);
         const currentPurchasedData2 = localPurchasedData2 ? JSON.parse(localPurchasedData2) : [];
         setPurchasedItems(currentPurchasedData2);
-        console.log('Updated purchased items state:', currentPurchasedData2.length, 'items');
+        console.log('🛒 MANUAL: Updated purchased items state:', currentPurchasedData2.length, 'items');
+        console.log('🛒 MANUAL: SUCCESS - Purchase completed!');
 
         return true;
       }

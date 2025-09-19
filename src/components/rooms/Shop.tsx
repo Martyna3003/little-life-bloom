@@ -30,8 +30,18 @@ interface ShopProps {
 
 const Shop = ({ coins, shopItems, purchasedItems, isLoading, onPurchase, onDebug }: ShopProps) => {
   const handlePurchase = async (item: ShopItem) => {
+    console.log('🛍️ SHOP: Purchase button clicked for item:', item.item_id);
+    console.log('🛍️ SHOP: Current coins:', coins);
+    console.log('🛍️ SHOP: Item cost:', item.cost);
+    console.log('🛍️ SHOP: Can afford?', coins >= item.cost);
+    console.log('🛍️ SHOP: onPurchase function exists?', !!onPurchase);
+    
     if (coins >= item.cost && onPurchase) {
-      await onPurchase(item.item_id);
+      console.log('🛍️ SHOP: Calling onPurchase function...');
+      const result = await onPurchase(item.item_id);
+      console.log('🛍️ SHOP: Purchase result:', result);
+    } else {
+      console.log('🛍️ SHOP: Purchase blocked - insufficient coins or no purchase function');
     }
   };
 
