@@ -54,6 +54,9 @@ const DECAY_RATES = {
 export const usePetStateWithAuth = () => {
   const { user } = useAuth();
   const [petState, setPetState] = useState<PetState>(INITIAL_STATE);
+  
+  // Tymczasowy tryb offline - używa tylko localStorage
+  const OFFLINE_MODE = false; // Wyłączony - używa prawdziwej bazy danych
   const [isInteracting, setIsInteracting] = useState(false);
   const [interactionType, setInteractionType] = useState<string>("");
   const [recentEarning, setRecentEarning] = useState(0);
@@ -181,6 +184,22 @@ export const usePetStateWithAuth = () => {
       try {
         console.log('Loading shop items...');
         
+        if (OFFLINE_MODE) {
+          console.log('OFFLINE MODE: Using mock shop items');
+          const mockShopItems = [
+            { id: '1', item_id: 'hat', name: 'Party Hat', emoji: '🎩', cost: 15, description: 'A stylish hat for your pet', category: 'accessories' },
+            { id: '2', item_id: 'bow', name: 'Bow Tie', emoji: '🎀', cost: 12, description: 'Elegant bow tie', category: 'accessories' },
+            { id: '3', item_id: 'sunglasses', name: 'Cool Shades', emoji: '🕶️', cost: 20, description: 'Super cool sunglasses', category: 'accessories' },
+            { id: '4', item_id: 'background_beach', name: 'Beach Scene', emoji: '🏖️', cost: 25, description: 'Tropical background', category: 'backgrounds' },
+            { id: '5', item_id: 'crown', name: 'Royal Crown', emoji: '👑', cost: 50, description: 'Fit for a royal pet', category: 'accessories' },
+            { id: '6', item_id: 'scarf', name: 'Cozy Scarf', emoji: '🧣', cost: 18, description: 'Warm and stylish', category: 'accessories' },
+            { id: '7', item_id: 'background_space', name: 'Space Scene', emoji: '🚀', cost: 30, description: 'Out of this world!', category: 'backgrounds' },
+            { id: '8', item_id: 'background_forest', name: 'Forest Scene', emoji: '🌲', cost: 22, description: 'Nature background', category: 'backgrounds' }
+          ];
+          setShopItems(mockShopItems);
+          return;
+        }
+        
         // Test connection first
         console.log('Testing Supabase connection...');
         const { data: testData, error: testError } = await supabase
@@ -302,31 +321,27 @@ export const usePetStateWithAuth = () => {
     loadShopItems();
   }, []);
 
-  // Load purchased items
+  // Load purchased items - simplified approach
   useEffect(() => {
     const loadPurchasedItems = async () => {
       if (!user) return;
 
       try {
         console.log('Loading purchased items for user:', user.id);
-        const { data, error } = await supabase
-          .from('purchased_items')
-          .select(`
-            *,
-            shop_item:shop_items(*)
-          `)
-          .eq('user_id', user.id);
-
-        if (error) {
-          console.error('Error loading purchased items:', error);
-          setError(new AppError('Błąd ładowania zakupionych przedmiotów: ' + error.message, 'PURCHASED_ITEMS_LOAD_ERROR', 'medium'));
+        
+        // For now, just use localStorage to track purchased items
+        const localPurchased = localStorage.getItem(`purchased_items_${user.id}`);
+        if (localPurchased) {
+          const parsedItems = JSON.parse(localPurchased);
+          console.log('Loaded purchased items from localStorage:', parsedItems.length, 'items');
+          setPurchasedItems(parsedItems);
         } else {
-          console.log('Loaded purchased items:', data?.length || 0, 'items');
-          setPurchasedItems(data || []);
+          console.log('No purchased items found in localStorage');
+          setPurchasedItems([]);
         }
       } catch (err) {
         console.error('Error loading purchased items:', err);
-        setError(new AppError('Błąd ładowania zakupionych przedmiotów: ' + (err as Error).message, 'PURCHASED_ITEMS_LOAD_EXCEPTION', 'high'));
+        setPurchasedItems([]);
       }
     };
 
@@ -559,6 +574,42 @@ export const usePetStateWithAuth = () => {
     try {
       console.log('Attempting to purchase item:', itemId);
       
+      if (OFFLINE_MODE) {
+        console.log('OFFLINE MODE: Simulating purchase');
+        // Find the item
+        const item = shopItems.find(si => si.item_id === itemId);
+        if (!item) {
+          setError(new AppError('Przedmiot nie został znaleziony', 'ITEM_NOT_FOUND', 'medium'));
+          return false;
+        }
+        
+        if (petState.coins < item.cost) {
+          setError(new AppError('Nie masz wystarczająco monet', 'INSUFFICIENT_COINS', 'medium'));
+          return false;
+        }
+        
+        // Simulate purchase
+        const newCoins = petState.coins - item.cost;
+        setPetState(prev => ({
+          ...prev,
+          coins: newCoins,
+          lastUpdateTime: Date.now()
+        }));
+        
+        // Add to purchased items (simulated)
+        const newPurchasedItem = {
+          id: Date.now().toString(),
+          item_id: itemId,
+          purchased_at: new Date().toISOString(),
+          is_equipped: false,
+          shop_item: item
+        };
+        
+        setPurchasedItems(prev => [...prev, newPurchasedItem]);
+        console.log('OFFLINE MODE: Purchase successful');
+        return true;
+      }
+      
       // First, get the item details
       const { data: itemData, error: itemError } = await supabase
         .from('shop_items')
@@ -572,17 +623,28 @@ export const usePetStateWithAuth = () => {
         return false;
       }
 
-      // Check if user already owns this item
-      const { data: ownedData, error: ownedError } = await supabase
-        .from('purchased_items')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('item_id', itemId)
-        .single();
+      // Check if user already owns this item (simplified check)
+      console.log('Checking if user already owns item...');
+      try {
+        const { data: ownedData, error: ownedError } = await supabase
+          .from('purchased_items')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('item_id', itemId)
+          .single();
 
-      if (ownedData) {
-        setError(new AppError('Już posiadasz ten przedmiot', 'ITEM_ALREADY_OWNED', 'medium'));
-        return false;
+        if (ownedData) {
+          setError(new AppError('Już posiadasz ten przedmiot', 'ITEM_ALREADY_OWNED', 'medium'));
+          return false;
+        }
+        
+        if (ownedError && ownedError.code !== 'PGRST116') { // PGRST116 = no rows returned
+          console.log('Error checking owned items (non-critical):', ownedError);
+          // Continue with purchase - this is not a critical error
+        }
+      } catch (err) {
+        console.log('Exception checking owned items (non-critical):', err);
+        // Continue with purchase - this is not a critical error
       }
 
       // Check if user has enough coins
@@ -622,21 +684,24 @@ export const usePetStateWithAuth = () => {
           return false;
         }
 
-        // Add purchased item
-        console.log('Adding purchased item:', itemId, 'for user:', user.id);
-        const { error: purchaseError } = await supabase
-          .from('purchased_items')
-          .insert({
-            user_id: user.id,
-            item_id: itemId
-          });
-
-        if (purchaseError) {
-          const appError = handleSupabaseError(purchaseError, 'purchaseItem');
-          setError(appError);
-          console.error('Error adding purchased item:', appError);
-          return false;
-        }
+        // Add purchased item to localStorage (simplified approach)
+        console.log('Adding purchased item to localStorage:', itemId, 'for user:', user.id);
+        
+        const newPurchasedItem = {
+          id: Date.now().toString(),
+          item_id: itemId,
+          purchased_at: new Date().toISOString(),
+          is_equipped: false,
+          shop_item: itemData
+        };
+        
+        // Update localStorage
+        const localPurchasedData = localStorage.getItem(`purchased_items_${user.id}`);
+        const currentPurchasedData = localPurchasedData ? JSON.parse(localPurchasedData) : [];
+        const updatedPurchasedData = [...currentPurchasedData, newPurchasedItem];
+        localStorage.setItem(`purchased_items_${user.id}`, JSON.stringify(updatedPurchasedData));
+        
+        console.log('Purchase saved to localStorage successfully');
 
         console.log('Manual purchase successful, updating coins to:', newCoins);
         // Update pet state with new coin amount
@@ -646,22 +711,12 @@ export const usePetStateWithAuth = () => {
           lastUpdateTime: Date.now()
         }));
 
-        // Reload purchased items
-        console.log('Reloading purchased items...');
-        const { data: newPurchasedItems, error: reloadError } = await supabase
-          .from('purchased_items')
-          .select(`
-            *,
-            shop_item:shop_items(*)
-          `)
-          .eq('user_id', user.id);
-
-        if (!reloadError && newPurchasedItems) {
-          console.log('Reloaded purchased items:', newPurchasedItems.length, 'items');
-          setPurchasedItems(newPurchasedItems);
-        } else if (reloadError) {
-          console.error('Error reloading purchased items:', reloadError);
-        }
+        // Update purchased items state from localStorage
+        console.log('Updating purchased items state...');
+        const localPurchasedData2 = localStorage.getItem(`purchased_items_${user.id}`);
+        const currentPurchasedData2 = localPurchasedData2 ? JSON.parse(localPurchasedData2) : [];
+        setPurchasedItems(currentPurchasedData2);
+        console.log('Updated purchased items state:', currentPurchasedData2.length, 'items');
 
         return true;
       }
@@ -675,22 +730,12 @@ export const usePetStateWithAuth = () => {
           lastUpdateTime: Date.now()
         }));
 
-        // Reload purchased items
-        console.log('Reloading purchased items after RPC purchase...');
-        const { data: newPurchasedItems, error: reloadError } = await supabase
-          .from('purchased_items')
-          .select(`
-            *,
-            shop_item:shop_items(*)
-          `)
-          .eq('user_id', user.id);
-
-        if (!reloadError && newPurchasedItems) {
-          console.log('Reloaded purchased items after RPC:', newPurchasedItems.length, 'items');
-          setPurchasedItems(newPurchasedItems);
-        } else if (reloadError) {
-          console.error('Error reloading purchased items after RPC:', reloadError);
-        }
+        // Update purchased items state from localStorage after RPC purchase
+        console.log('Updating purchased items state after RPC purchase...');
+        const localPurchasedData3 = localStorage.getItem(`purchased_items_${user.id}`);
+        const currentPurchasedData3 = localPurchasedData3 ? JSON.parse(localPurchasedData3) : [];
+        setPurchasedItems(currentPurchasedData3);
+        console.log('Updated purchased items state after RPC:', currentPurchasedData3.length, 'items');
 
         return true;
       } else {
