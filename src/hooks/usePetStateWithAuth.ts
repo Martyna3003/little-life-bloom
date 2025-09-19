@@ -651,98 +651,65 @@ export const usePetStateWithAuth = () => {
         return false;
       }
 
-      // Try to use the RPC function first
-      console.log('🛒 Attempting to call purchase_item RPC function...');
-      const { data, error } = await supabase.rpc('purchase_item', {
-        p_item_id: itemId
-      });
+      // Manual purchase only (no RPC function)
+      console.log('🛒 MANUAL PURCHASE: Starting purchase for item:', itemId);
+      
+      const newCoins = petState.coins - itemData.cost;
+      
+      // Update coins
+      console.log('🛒 MANUAL: Updating coins from', petState.coins, 'to', newCoins);
+      const { error: updateError } = await supabase
+        .from('pet_data')
+        .update({ 
+          coins: newCoins, 
+          last_update_time: new Date().toISOString() 
+        })
+        .eq('user_id', user.id);
 
-      console.log('🛒 RPC Purchase response:', { data, error });
-
-      if (error) {
-        console.log('🛒 RPC function failed, trying manual purchase...', error);
-        
-        // Fallback: manual purchase
-        const newCoins = petState.coins - itemData.cost;
-        
-        // Update coins
-        console.log('🛒 MANUAL: Updating coins from', petState.coins, 'to', newCoins);
-        const { error: updateError } = await supabase
-          .from('pet_data')
-          .update({ 
-            coins: newCoins, 
-            last_update_time: new Date().toISOString() 
-          })
-          .eq('user_id', user.id);
-
-        if (updateError) {
-          console.log('🛒 MANUAL: Error updating coins:', updateError);
-          const appError = handleSupabaseError(updateError, 'purchaseItem');
-          setError(appError);
-          console.error('Error updating coins:', appError);
-          return false;
-        }
-
-        // Add purchased item to localStorage (simplified approach)
-        console.log('Adding purchased item to localStorage:', itemId, 'for user:', user.id);
-        
-        const newPurchasedItem = {
-          id: Date.now().toString(),
-          item_id: itemId,
-          purchased_at: new Date().toISOString(),
-          is_equipped: false,
-          shop_item: itemData
-        };
-        
-        // Update localStorage
-        const localPurchasedData = localStorage.getItem(`purchased_items_${user.id}`);
-        const currentPurchasedData = localPurchasedData ? JSON.parse(localPurchasedData) : [];
-        const updatedPurchasedData = [...currentPurchasedData, newPurchasedItem];
-        localStorage.setItem(`purchased_items_${user.id}`, JSON.stringify(updatedPurchasedData));
-        
-        console.log('Purchase saved to localStorage successfully');
-
-        console.log('🛒 MANUAL: Purchase successful, updating coins to:', newCoins);
-        // Update pet state with new coin amount
-        setPetState(prev => ({
-          ...prev,
-          coins: newCoins,
-          lastUpdateTime: Date.now()
-        }));
-
-        // Update purchased items state from localStorage
-        console.log('🛒 MANUAL: Updating purchased items state...');
-        const localPurchasedData2 = localStorage.getItem(`purchased_items_${user.id}`);
-        const currentPurchasedData2 = localPurchasedData2 ? JSON.parse(localPurchasedData2) : [];
-        setPurchasedItems(currentPurchasedData2);
-        console.log('🛒 MANUAL: Updated purchased items state:', currentPurchasedData2.length, 'items');
-        console.log('🛒 MANUAL: SUCCESS - Purchase completed!');
-
-        return true;
-      }
-
-      if (data && data.success) {
-        console.log('Purchase successful via RPC, updating coins to:', data.remaining_coins);
-        // Update pet state with new coin amount
-        setPetState(prev => ({
-          ...prev,
-          coins: data.remaining_coins,
-          lastUpdateTime: Date.now()
-        }));
-
-        // Update purchased items state from localStorage after RPC purchase
-        console.log('Updating purchased items state after RPC purchase...');
-        const localPurchasedData3 = localStorage.getItem(`purchased_items_${user.id}`);
-        const currentPurchasedData3 = localPurchasedData3 ? JSON.parse(localPurchasedData3) : [];
-        setPurchasedItems(currentPurchasedData3);
-        console.log('Updated purchased items state after RPC:', currentPurchasedData3.length, 'items');
-
-        return true;
-      } else {
-        console.log('Purchase failed via RPC:', data?.error);
-        setError(new AppError(data?.error || 'Nie udało się kupić przedmiotu', 'PURCHASE_FAILED', 'medium'));
+      if (updateError) {
+        console.log('🛒 MANUAL: Error updating coins:', updateError);
+        const appError = handleSupabaseError(updateError, 'purchaseItem');
+        setError(appError);
+        console.error('Error updating coins:', appError);
         return false;
       }
+
+      // Add purchased item to localStorage (simplified approach)
+      console.log('🛒 MANUAL: Adding purchased item to localStorage:', itemId, 'for user:', user.id);
+      
+      const newPurchasedItem = {
+        id: Date.now().toString(),
+        item_id: itemId,
+        purchased_at: new Date().toISOString(),
+        is_equipped: false,
+        shop_item: itemData
+      };
+      
+      // Update localStorage
+      const localPurchasedData = localStorage.getItem(`purchased_items_${user.id}`);
+      const currentPurchasedData = localPurchasedData ? JSON.parse(localPurchasedData) : [];
+      const updatedPurchasedData = [...currentPurchasedData, newPurchasedItem];
+      localStorage.setItem(`purchased_items_${user.id}`, JSON.stringify(updatedPurchasedData));
+      
+      console.log('🛒 MANUAL: Purchase saved to localStorage successfully');
+
+      console.log('🛒 MANUAL: Purchase successful, updating coins to:', newCoins);
+      // Update pet state with new coin amount
+      setPetState(prev => ({
+        ...prev,
+        coins: newCoins,
+        lastUpdateTime: Date.now()
+      }));
+
+      // Update purchased items state from localStorage
+      console.log('🛒 MANUAL: Updating purchased items state...');
+      const localPurchasedData2 = localStorage.getItem(`purchased_items_${user.id}`);
+      const currentPurchasedData2 = localPurchasedData2 ? JSON.parse(localPurchasedData2) : [];
+      setPurchasedItems(currentPurchasedData2);
+      console.log('🛒 MANUAL: Updated purchased items state:', currentPurchasedData2.length, 'items');
+      console.log('🛒 MANUAL: SUCCESS - Purchase completed!');
+
+      return true;
     } catch (err) {
       const appError = handleError(err, 'purchaseItem');
       setError(appError);

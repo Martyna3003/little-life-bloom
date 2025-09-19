@@ -29,6 +29,14 @@ interface ShopProps {
 }
 
 const Shop = ({ coins, shopItems, purchasedItems, isLoading, onPurchase, onDebug }: ShopProps) => {
+  console.log('🛍️ SHOP: Component rendered with:', {
+    coins,
+    shopItemsLength: shopItems.length,
+    purchasedItemsLength: purchasedItems.length,
+    purchasedItems,
+    isLoading,
+    hasOnPurchase: !!onPurchase
+  });
   const handlePurchase = async (item: ShopItem) => {
     console.log('🛍️ SHOP: Purchase button clicked for item:', item.item_id);
     console.log('🛍️ SHOP: Current coins:', coins);
@@ -46,7 +54,12 @@ const Shop = ({ coins, shopItems, purchasedItems, isLoading, onPurchase, onDebug
   };
 
   const isItemOwned = (itemId: string) => {
-    return purchasedItems.some(purchased => purchased.item_id === itemId);
+    console.log('🛍️ SHOP: Checking if item is owned:', itemId);
+    console.log('🛍️ SHOP: Current purchasedItems:', purchasedItems);
+    console.log('🛍️ SHOP: PurchasedItems length:', purchasedItems.length);
+    const owned = purchasedItems.some(purchased => purchased.item_id === itemId);
+    console.log('🛍️ SHOP: Is owned?', owned);
+    return owned;
   };
 
   return (
@@ -61,9 +74,20 @@ const Shop = ({ coins, shopItems, purchasedItems, isLoading, onPurchase, onDebug
             size="sm" 
             className="mt-2"
           >
-            Debug Shop ({shopItems.length} items)
+            Debug Shop ({shopItems.length} items, {purchasedItems.length} owned)
           </Button>
         )}
+        <div className="text-xs text-muted-foreground mt-2">
+          Debug Info: {purchasedItems.length} purchased items loaded
+          {purchasedItems.length > 0 && (
+            <div className="mt-1">
+              Owned: {purchasedItems.map(item => item.item_id).join(', ')}
+            </div>
+          )}
+        </div>
+        <div className="text-xs text-muted-foreground mt-1">
+          Current coins: {coins}
+        </div>
       </div>
 
       <div className="bg-gradient-to-r from-yellow-400/20 to-orange-400/20 rounded-2xl p-4 border-2 border-white/30">
@@ -77,6 +101,13 @@ const Shop = ({ coins, shopItems, purchasedItems, isLoading, onPurchase, onDebug
         {shopItems.map((item) => {
           const canAfford = coins >= item.cost;
           const isOwned = isItemOwned(item.item_id);
+          
+          console.log('🛍️ SHOP: Rendering item:', item.item_id, {
+            canAfford,
+            isOwned,
+            cost: item.cost,
+            coins
+          });
           
           return (
             <div key={item.id} className="bg-white/30 rounded-2xl p-4 border border-white/50">
@@ -98,6 +129,9 @@ const Shop = ({ coins, shopItems, purchasedItems, isLoading, onPurchase, onDebug
               >
                 {isLoading ? 'Loading...' : isOwned ? 'Owned' : canAfford ? 'Buy' : 'Too Expensive'}
               </Button>
+              <div className="text-xs text-muted-foreground mt-1">
+                Debug: {isOwned ? 'OWNED' : canAfford ? 'CAN BUY' : 'TOO EXPENSIVE'}
+              </div>
             </div>
           );
         })}
