@@ -12,7 +12,22 @@ import { useRoomNavigation } from "@/hooks/useRoomNavigation";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
-  const { petState, isInteracting, interactionType, recentEarning, isLoading, error, errorMessage, isUpdating, pendingUpdates, actions } = usePetStateWithAuth();
+  const { 
+    petState, 
+    isInteracting, 
+    interactionType, 
+    recentEarning, 
+    isLoading, 
+    error, 
+    errorMessage, 
+    isUpdating, 
+    pendingUpdates, 
+    showSyncMessage, 
+    shopItems, 
+    purchasedItems, 
+    isLoadingShop, 
+    actions 
+  } = usePetStateWithAuth();
   const { currentRoom, navigateToRoom } = useRoomNavigation();
 
   if (isLoading) {
@@ -35,6 +50,7 @@ const Index = () => {
       isInteracting,
       interactionType,
       disabled: isInteracting,
+      purchasedItems,
     };
 
     switch (currentRoom) {
@@ -47,7 +63,13 @@ const Index = () => {
       case 'bedroom':
         return <Bedroom {...commonProps} onSleep={actions.sleep} />;
       case 'shop':
-        return <Shop coins={petState.coins} />;
+        return <Shop 
+          coins={petState.coins} 
+          shopItems={shopItems}
+          purchasedItems={purchasedItems}
+          isLoading={isLoadingShop}
+          onPurchase={actions.purchaseItem}
+        />;
       default:
         return <LivingRoom {...commonProps} />;
     }
@@ -80,12 +102,12 @@ const Index = () => {
         )}
 
         {/* Performance Indicators */}
-        {(isUpdating || pendingUpdates > 0) && (
+        {showSyncMessage && (
           <div className="mx-4 mb-4 p-2 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center gap-2">
               <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
               <p className="text-xs text-blue-600">
-                {isUpdating ? 'Synchronizacja danych...' : `Oczekuje ${pendingUpdates} aktualizacji`}
+                Synchronizacja danych...
               </p>
             </div>
           </div>

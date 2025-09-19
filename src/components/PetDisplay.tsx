@@ -1,6 +1,21 @@
 import { useState, useEffect } from "react";
 import petImage from "@/assets/pet-character.png";
 
+interface PurchasedItem {
+  id: string;
+  item_id: string;
+  purchased_at: string;
+  is_equipped: boolean;
+  shop_item: {
+    id: string;
+    name: string;
+    emoji: string;
+    cost: number;
+    description: string;
+    category: string;
+  };
+}
+
 interface PetDisplayProps {
   happiness: number;
   hunger: number;
@@ -8,9 +23,10 @@ interface PetDisplayProps {
   energy: number;
   isInteracting: boolean;
   interactionType?: string;
+  purchasedItems?: PurchasedItem[];
 }
 
-const PetDisplay = ({ happiness, hunger, cleanliness, energy, isInteracting, interactionType }: PetDisplayProps) => {
+const PetDisplay = ({ happiness, hunger, cleanliness, energy, isInteracting, interactionType, purchasedItems = [] }: PetDisplayProps) => {
   const [petMood, setPetMood] = useState("neutral");
   
   useEffect(() => {
@@ -71,16 +87,75 @@ const PetDisplay = ({ happiness, hunger, cleanliness, energy, isInteracting, int
     }
   };
 
+  const renderAccessories = () => {
+    const accessories = purchasedItems.filter(item => 
+      item.shop_item.category === 'accessories' && item.is_equipped
+    );
+
+    return accessories.map((item) => {
+      const { item_id, shop_item } = item;
+      const { emoji } = shop_item;
+
+      // Position accessories based on item type
+      const getAccessoryPosition = (itemId: string) => {
+        switch (itemId) {
+          case 'hat':
+          case 'crown':
+            return 'absolute top-2 left-1/2 transform -translate-x-1/2 text-3xl z-10';
+          case 'bow':
+            return 'absolute top-8 left-1/2 transform -translate-x-1/2 text-2xl z-10';
+          case 'sunglasses':
+            return 'absolute top-12 left-1/2 transform -translate-x-1/2 text-2xl z-10';
+          case 'scarf':
+            return 'absolute top-16 left-1/2 transform -translate-x-1/2 text-2xl z-10';
+          default:
+            return 'absolute top-4 left-1/2 transform -translate-x-1/2 text-2xl z-10';
+        }
+      };
+
+      return (
+        <div
+          key={item.id}
+          className={getAccessoryPosition(item_id)}
+          style={{ 
+            animation: isInteracting ? 'bounce-gentle 1s ease-in-out infinite' : 'float 3s ease-in-out infinite'
+          }}
+        >
+          {emoji}
+        </div>
+      );
+    });
+  };
+
+  const renderBackground = () => {
+    const background = purchasedItems.find(item => 
+      item.shop_item.category === 'backgrounds' && item.is_equipped
+    );
+
+    if (!background) return null;
+
+    const { emoji } = background.shop_item;
+    
+    return (
+      <div className="absolute inset-0 flex items-center justify-center text-6xl opacity-20 z-0">
+        {emoji}
+      </div>
+    );
+  };
+
   return (
     <div className={getContainerClass()}>
+      {/* Background */}
+      {renderBackground()}
+      
       {/* Mood indicator */}
-      <div className="absolute top-4 right-4 text-2xl animate-pulse-gentle">
+      <div className="absolute top-4 right-4 text-2xl animate-pulse-gentle z-20">
         {getMoodEmoji()}
       </div>
       
       {/* Interaction feedback */}
       {isInteracting && (
-        <div className="absolute top-4 left-4 text-2xl animate-bounce-gentle">
+        <div className="absolute top-4 left-4 text-2xl animate-bounce-gentle z-20">
           {interactionType === "feed" && "🍎"}
           {interactionType === "clean" && "🚿"}
           {interactionType === "sleep" && "💤"}
@@ -95,14 +170,17 @@ const PetDisplay = ({ happiness, hunger, cleanliness, energy, isInteracting, int
         className={getPetClass()}
       />
       
+      {/* Accessories */}
+      {renderAccessories()}
+      
       {/* Status effects */}
       {cleanliness < 30 && (
-        <div className="absolute bottom-4 left-4 text-yellow-600">
+        <div className="absolute bottom-4 left-4 text-yellow-600 z-20">
           💨 Dirty
         </div>
       )}
       {energy < 30 && (
-        <div className="absolute bottom-4 right-4 text-blue-600">
+        <div className="absolute bottom-4 right-4 text-blue-600 z-20">
           😴 Tired
         </div>
       )}

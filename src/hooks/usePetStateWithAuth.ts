@@ -16,6 +16,23 @@ interface PetState {
   lastUpdateTime: number;
 }
 
+interface ShopItem {
+  id: string;
+  name: string;
+  emoji: string;
+  cost: number;
+  description: string;
+  category: string;
+}
+
+interface PurchasedItem {
+  id: string;
+  item_id: string;
+  purchased_at: string;
+  is_equipped: boolean;
+  shop_item: ShopItem;
+}
+
 const INITIAL_STATE: PetState = {
   happiness: 75,
   hunger: 25,
@@ -41,6 +58,9 @@ export const usePetStateWithAuth = () => {
   const [recentEarning, setRecentEarning] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<AppError | null>(null);
+  const [shopItems, setShopItems] = useState<ShopItem[]>([]);
+  const [purchasedItems, setPurchasedItems] = useState<PurchasedItem[]>([]);
+  const [isLoadingShop, setIsLoadingShop] = useState(false);
 
   // Performance optimizations
   const debouncedPetState = useDebounce(petState, 500); // Debounce for 500ms
@@ -116,6 +136,57 @@ export const usePetStateWithAuth = () => {
     };
 
     loadPetData();
+  }, [user]);
+
+  // Load shop items
+  useEffect(() => {
+    const loadShopItems = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shop_items')
+          .select('*')
+          .eq('is_active', true)
+          .order('category', { ascending: true })
+          .order('cost', { ascending: true });
+
+        if (error) {
+          console.error('Error loading shop items:', error);
+        } else {
+          setShopItems(data || []);
+        }
+      } catch (err) {
+        console.error('Error loading shop items:', err);
+      }
+    };
+
+    loadShopItems();
+  }, []);
+
+  // Load purchased items
+  useEffect(() => {
+    const loadPurchasedItems = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('purchased_items')
+          .select(`
+            *,
+            shop_item:shop_items(*)
+          `)
+          .eq('user_id', user.id);
+
+        if (error) {
+          console.error('Error loading purchased items:', error);
+        } else {
+          setPurchasedItems(data || []);
+        }
+      } catch (err) {
+        console.error('Error loading purchased items:', err);
+      }
+    };
+
+    loadPurchasedItems();
   }, [user]);
 
   // Save pet data to database (optimized version)
@@ -301,6 +372,63 @@ export const usePetStateWithAuth = () => {
     });
   }, [petState, performAction]);
 
+  const purchaseItem = useCallback(async (itemId: string) => {
+    if (!user) {
+      setError(new AppError('Musisz być zalogowany, aby kupować przedmioty', 'AUTH_REQUIRED', 'medium'));
+      return false;
+    }
+
+    setIsLoadingShop(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase.rpc('purchase_item', {
+        p_item_id: itemId
+      });
+
+      if (error) {
+        const appError = handleSupabaseError(error, 'purchaseItem');
+        setError(appError);
+        console.error('Error purchasing item:', appError);
+        return false;
+      }
+
+      if (data && data.success) {
+        // Update pet state with new coin amount
+        setPetState(prev => ({
+          ...prev,
+          coins: data.remaining_coins,
+          lastUpdateTime: Date.now()
+        }));
+
+        // Reload purchased items
+        const { data: newPurchasedItems, error: reloadError } = await supabase
+          .from('purchased_items')
+          .select(`
+            *,
+            shop_item:shop_items(*)
+          `)
+          .eq('user_id', user.id);
+
+        if (!reloadError && newPurchasedItems) {
+          setPurchasedItems(newPurchasedItems);
+        }
+
+        return true;
+      } else {
+        setError(new AppError(data?.error || 'Nie udało się kupić przedmiotu', 'PURCHASE_FAILED', 'medium'));
+        return false;
+      }
+    } catch (err) {
+      const appError = handleError(err, 'purchaseItem');
+      setError(appError);
+      console.error('Error purchasing item:', appError);
+      return false;
+    } finally {
+      setIsLoadingShop(false);
+    }
+  }, [user]);
+
   return {
     petState,
     isInteracting,
@@ -311,11 +439,16 @@ export const usePetStateWithAuth = () => {
     errorMessage: error ? getUserFriendlyMessage(error) : null,
     isUpdating: batchUpdates.isUpdating,
     pendingUpdates: batchUpdates.pendingUpdates,
+    showSyncMessage: batchUpdates.showSyncMessage,
+    shopItems,
+    purchasedItems,
+    isLoadingShop,
     actions: {
       feed,
       clean,
       sleep,
       play,
+      purchaseItem,
     },
   };
 };

@@ -1,6 +1,21 @@
 import PetDisplay from "@/components/PetDisplay";
 import PetStats from "@/components/PetStats";
 
+interface PurchasedItem {
+  id: string;
+  item_id: string;
+  purchased_at: string;
+  is_equipped: boolean;
+  shop_item: {
+    id: string;
+    name: string;
+    emoji: string;
+    cost: number;
+    description: string;
+    category: string;
+  };
+}
+
 interface LivingRoomProps {
   happiness: number;
   hunger: number;
@@ -8,9 +23,10 @@ interface LivingRoomProps {
   energy: number;
   isInteracting: boolean;
   interactionType?: string;
+  purchasedItems?: PurchasedItem[];
 }
 
-const LivingRoom = ({ happiness, hunger, cleanliness, energy, isInteracting, interactionType }: LivingRoomProps) => {
+const LivingRoom = ({ happiness, hunger, cleanliness, energy, isInteracting, interactionType, purchasedItems }: LivingRoomProps) => {
   return (
     <div className="flex-1 space-y-4 p-4">
       <div className="text-center">
@@ -25,6 +41,7 @@ const LivingRoom = ({ happiness, hunger, cleanliness, energy, isInteracting, int
         energy={energy}
         isInteracting={isInteracting}
         interactionType={interactionType}
+        purchasedItems={purchasedItems}
       />
 
       <PetStats

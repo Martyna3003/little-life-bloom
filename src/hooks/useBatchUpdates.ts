@@ -14,6 +14,8 @@ export function useBatchUpdates<T>(
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const onBatchProcess = useRef<((updates: BatchUpdate<T>[]) => Promise<void>) | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showSyncMessage, setShowSyncMessage] = useState(false);
+  const syncMessageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const addToBatch = useCallback((id: string, data: T) => {
     // Remove existing update with same id
@@ -55,6 +57,12 @@ export function useBatchUpdates<T>(
     }
 
     setIsUpdating(true);
+    
+    // Show sync message after 1 second delay
+    syncMessageTimeoutRef.current = setTimeout(() => {
+      setShowSyncMessage(true);
+    }, 1000);
+    
     try {
       await onBatchProcess.current(updates);
     } catch (error) {
@@ -63,6 +71,13 @@ export function useBatchUpdates<T>(
       batchRef.current.unshift(...updates);
     } finally {
       setIsUpdating(false);
+      setShowSyncMessage(false);
+      
+      // Clear sync message timeout
+      if (syncMessageTimeoutRef.current) {
+        clearTimeout(syncMessageTimeoutRef.current);
+        syncMessageTimeoutRef.current = null;
+      }
     }
   }, []);
 
@@ -76,6 +91,9 @@ export function useBatchUpdates<T>(
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      if (syncMessageTimeoutRef.current) {
+        clearTimeout(syncMessageTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -85,5 +103,6 @@ export function useBatchUpdates<T>(
     processBatch,
     pendingUpdates: batchRef.current.length,
     isUpdating,
+    showSyncMessage,
   };
 }

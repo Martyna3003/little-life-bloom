@@ -1,6 +1,21 @@
 import { Button } from "@/components/ui/button";
 import PetDisplay from "@/components/PetDisplay";
 
+interface PurchasedItem {
+  id: string;
+  item_id: string;
+  purchased_at: string;
+  is_equipped: boolean;
+  shop_item: {
+    id: string;
+    name: string;
+    emoji: string;
+    cost: number;
+    description: string;
+    category: string;
+  };
+}
+
 interface BedroomProps {
   happiness: number;
   hunger: number;
@@ -10,9 +25,10 @@ interface BedroomProps {
   interactionType?: string;
   onSleep: () => void;
   disabled?: boolean;
+  purchasedItems?: PurchasedItem[];
 }
 
-const Bedroom = ({ happiness, hunger, cleanliness, energy, isInteracting, interactionType, onSleep, disabled }: BedroomProps) => {
+const Bedroom = ({ happiness, hunger, cleanliness, energy, isInteracting, interactionType, onSleep, disabled, purchasedItems }: BedroomProps) => {
   return (
     <div className="flex-1 space-y-4 p-4">
       <div className="text-center">
@@ -27,6 +43,7 @@ const Bedroom = ({ happiness, hunger, cleanliness, energy, isInteracting, intera
         energy={energy}
         isInteracting={isInteracting}
         interactionType={interactionType}
+        purchasedItems={purchasedItems}
       />
 
       <div className="bg-gradient-to-br from-pet-tired/20 to-indigo-400/20 rounded-3xl p-6 border-2 border-white/30">

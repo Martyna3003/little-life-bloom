@@ -1,23 +1,41 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-interface ShopProps {
-  coins: number;
-  onPurchase?: (item: string, cost: number) => void;
+interface ShopItem {
+  id: string;
+  item_id: string;
+  name: string;
+  emoji: string;
+  cost: number;
+  description: string;
+  category: string;
 }
 
-const Shop = ({ coins, onPurchase }: ShopProps) => {
-  const items = [
-    { id: 'hat', name: 'Party Hat', emoji: '🎩', cost: 15, description: 'A stylish hat for your pet' },
-    { id: 'bow', name: 'Bow Tie', emoji: '🎀', cost: 12, description: 'Elegant bow tie' },
-    { id: 'sunglasses', name: 'Cool Shades', emoji: '🕶️', cost: 20, description: 'Super cool sunglasses' },
-    { id: 'background', name: 'Beach Scene', emoji: '🏖️', cost: 25, description: 'Tropical background' },
-  ];
+interface PurchasedItem {
+  id: string;
+  item_id: string;
+  purchased_at: string;
+  is_equipped: boolean;
+  shop_item: ShopItem;
+}
 
-  const handlePurchase = (item: typeof items[0]) => {
+interface ShopProps {
+  coins: number;
+  shopItems: ShopItem[];
+  purchasedItems: PurchasedItem[];
+  isLoading: boolean;
+  onPurchase?: (itemId: string) => Promise<boolean>;
+}
+
+const Shop = ({ coins, shopItems, purchasedItems, isLoading, onPurchase }: ShopProps) => {
+  const handlePurchase = async (item: ShopItem) => {
     if (coins >= item.cost && onPurchase) {
-      onPurchase(item.id, item.cost);
+      await onPurchase(item.item_id);
     }
+  };
+
+  const isItemOwned = (itemId: string) => {
+    return purchasedItems.some(purchased => purchased.item_id === itemId);
   };
 
   return (
@@ -35,8 +53,9 @@ const Shop = ({ coins, onPurchase }: ShopProps) => {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {items.map((item) => {
+        {shopItems.map((item) => {
           const canAfford = coins >= item.cost;
+          const isOwned = isItemOwned(item.item_id);
           
           return (
             <div key={item.id} className="bg-white/30 rounded-2xl p-4 border border-white/50">
@@ -44,19 +63,19 @@ const Shop = ({ coins, onPurchase }: ShopProps) => {
                 <div className="text-4xl mb-2">{item.emoji}</div>
                 <h3 className="font-semibold text-sm">{item.name}</h3>
                 <p className="text-xs text-muted-foreground mb-2">{item.description}</p>
-                <Badge variant={canAfford ? "default" : "secondary"} className="mb-2">
-                  {item.cost} coins
+                <Badge variant={isOwned ? "outline" : canAfford ? "default" : "secondary"} className="mb-2">
+                  {isOwned ? 'Owned' : `${item.cost} coins`}
                 </Badge>
               </div>
               
               <Button
                 onClick={() => handlePurchase(item)}
-                disabled={!canAfford}
-                variant={canAfford ? "default" : "secondary"}
+                disabled={!canAfford || isOwned || isLoading}
+                variant={isOwned ? "outline" : canAfford ? "default" : "secondary"}
                 size="sm"
                 className="w-full"
               >
-                {canAfford ? 'Buy' : 'Too Expensive'}
+                {isLoading ? 'Loading...' : isOwned ? 'Owned' : canAfford ? 'Buy' : 'Too Expensive'}
               </Button>
             </div>
           );

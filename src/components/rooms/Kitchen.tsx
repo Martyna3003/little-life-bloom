@@ -1,6 +1,21 @@
 import { Button } from "@/components/ui/button";
 import PetDisplay from "@/components/PetDisplay";
 
+interface PurchasedItem {
+  id: string;
+  item_id: string;
+  purchased_at: string;
+  is_equipped: boolean;
+  shop_item: {
+    id: string;
+    name: string;
+    emoji: string;
+    cost: number;
+    description: string;
+    category: string;
+  };
+}
+
 interface KitchenProps {
   happiness: number;
   hunger: number;
@@ -10,9 +25,10 @@ interface KitchenProps {
   interactionType?: string;
   onFeed: () => void;
   disabled?: boolean;
+  purchasedItems?: PurchasedItem[];
 }
 
-const Kitchen = ({ happiness, hunger, cleanliness, energy, isInteracting, interactionType, onFeed, disabled }: KitchenProps) => {
+const Kitchen = ({ happiness, hunger, cleanliness, energy, isInteracting, interactionType, onFeed, disabled, purchasedItems }: KitchenProps) => {
   const foods = [
     { name: "Apple", emoji: "🍎", hungerReduction: 30 },
     { name: "Bread", emoji: "🍞", hungerReduction: 20 },
@@ -32,6 +48,7 @@ const Kitchen = ({ happiness, hunger, cleanliness, energy, isInteracting, intera
         energy={energy}
         isInteracting={isInteracting}
         interactionType={interactionType}
+        purchasedItems={purchasedItems}
       />
 
       <div className="bg-gradient-to-br from-pet-hungry/20 to-orange-400/20 rounded-3xl p-6 border-2 border-white/30">

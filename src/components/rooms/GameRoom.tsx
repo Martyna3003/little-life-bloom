@@ -1,6 +1,21 @@
 import { Button } from "@/components/ui/button";
 import PetDisplay from "@/components/PetDisplay";
 
+interface PurchasedItem {
+  id: string;
+  item_id: string;
+  purchased_at: string;
+  is_equipped: boolean;
+  shop_item: {
+    id: string;
+    name: string;
+    emoji: string;
+    cost: number;
+    description: string;
+    category: string;
+  };
+}
+
 interface GameRoomProps {
   happiness: number;
   hunger: number;
@@ -10,9 +25,10 @@ interface GameRoomProps {
   interactionType?: string;
   onPlay: () => void;
   disabled?: boolean;
+  purchasedItems?: PurchasedItem[];
 }
 
-const GameRoom = ({ happiness, hunger, cleanliness, energy, isInteracting, interactionType, onPlay, disabled }: GameRoomProps) => {
+const GameRoom = ({ happiness, hunger, cleanliness, energy, isInteracting, interactionType, onPlay, disabled, purchasedItems }: GameRoomProps) => {
   const canPlay = energy >= 20;
   
   return (
@@ -29,6 +45,7 @@ const GameRoom = ({ happiness, hunger, cleanliness, energy, isInteracting, inter
         energy={energy}
         isInteracting={isInteracting}
         interactionType={interactionType}
+        purchasedItems={purchasedItems}
       />
 
       <div className="bg-gradient-to-br from-pet-happy/20 to-green-400/20 rounded-3xl p-6 border-2 border-white/30">
