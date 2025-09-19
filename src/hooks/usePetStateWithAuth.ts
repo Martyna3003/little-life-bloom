@@ -77,9 +77,42 @@ export const usePetStateWithAuth = () => {
       setIsLoading(true);
       setError(null);
       
+      // Test Supabase connection first
+      console.log('Testing Supabase connection in loadPetData...');
+      try {
+        const { data: testData, error: testError } = await supabase
+          .from('pet_data')
+          .select('count')
+          .limit(1);
+        
+        if (testError) {
+          console.error('Supabase connection failed in loadPetData:', testError);
+          setError(new AppError('Błąd połączenia z bazą danych: ' + testError.message, 'SUPABASE_CONNECTION_ERROR', 'high'));
+          // Fallback to localStorage
+          const saved = localStorage.getItem("petState");
+          if (saved) {
+            setPetState(JSON.parse(saved));
+          }
+          setIsLoading(false);
+          return;
+        }
+        console.log('Supabase connection successful in loadPetData');
+      } catch (err) {
+        console.error('Supabase connection exception in loadPetData:', err);
+        setError(new AppError('Błąd połączenia z bazą danych: ' + (err as Error).message, 'SUPABASE_CONNECTION_EXCEPTION', 'high'));
+        // Fallback to localStorage
+        const saved = localStorage.getItem("petState");
+        if (saved) {
+          setPetState(JSON.parse(saved));
+        }
+        setIsLoading(false);
+        return;
+      }
+      
       if (user) {
         // Load from database
         try {
+          console.log('Loading pet data for user:', user.id);
           const { data, error } = await supabase
             .from('pet_data')
             .select('*')
@@ -147,6 +180,28 @@ export const usePetStateWithAuth = () => {
     const loadShopItems = async () => {
       try {
         console.log('Loading shop items...');
+        
+        // Test connection first
+        console.log('Testing Supabase connection...');
+        const { data: testData, error: testError } = await supabase
+          .from('shop_items')
+          .select('count')
+          .limit(1);
+        
+        if (testError) {
+          console.error('Supabase connection failed:', testError);
+          console.log('Error details:', {
+            message: testError.message,
+            details: testError.details,
+            hint: testError.hint,
+            code: testError.code
+          });
+          setError(new AppError('Błąd połączenia z bazą danych: ' + testError.message, 'SUPABASE_CONNECTION_ERROR', 'high'));
+          return;
+        }
+        
+        console.log('Supabase connection successful');
+        
         const { data, error } = await supabase
           .from('shop_items')
           .select('*')
@@ -158,6 +213,7 @@ export const usePetStateWithAuth = () => {
 
         if (error) {
           console.error('Error loading shop items:', error);
+          setError(new AppError('Błąd ładowania przedmiotów sklepu: ' + error.message, 'SHOP_LOAD_ERROR', 'medium'));
         } else {
           console.log('Loaded shop items:', data?.length || 0, 'items');
           
@@ -239,6 +295,7 @@ export const usePetStateWithAuth = () => {
         }
       } catch (err) {
         console.error('Error loading shop items:', err);
+        setError(new AppError('Błąd ładowania sklepu: ' + (err as Error).message, 'SHOP_LOAD_EXCEPTION', 'high'));
       }
     };
 
@@ -251,6 +308,7 @@ export const usePetStateWithAuth = () => {
       if (!user) return;
 
       try {
+        console.log('Loading purchased items for user:', user.id);
         const { data, error } = await supabase
           .from('purchased_items')
           .select(`
@@ -261,11 +319,14 @@ export const usePetStateWithAuth = () => {
 
         if (error) {
           console.error('Error loading purchased items:', error);
+          setError(new AppError('Błąd ładowania zakupionych przedmiotów: ' + error.message, 'PURCHASED_ITEMS_LOAD_ERROR', 'medium'));
         } else {
+          console.log('Loaded purchased items:', data?.length || 0, 'items');
           setPurchasedItems(data || []);
         }
       } catch (err) {
         console.error('Error loading purchased items:', err);
+        setError(new AppError('Błąd ładowania zakupionych przedmiotów: ' + (err as Error).message, 'PURCHASED_ITEMS_LOAD_EXCEPTION', 'high'));
       }
     };
 
@@ -296,6 +357,21 @@ export const usePetStateWithAuth = () => {
       // Save to database
       try {
         console.log('Attempting to save pet data to database...');
+        
+        // Test connection first
+        const { data: testData, error: testError } = await supabase
+          .from('pet_data')
+          .select('count')
+          .limit(1);
+        
+        if (testError) {
+          console.error('Supabase connection failed in savePetData:', testError);
+          setError(new AppError('Błąd połączenia z bazą danych podczas zapisywania: ' + testError.message, 'SUPABASE_SAVE_CONNECTION_ERROR', 'high'));
+          // Still save to localStorage as backup
+          localStorage.setItem("petState", JSON.stringify(sanitizedState));
+          return;
+        }
+        
         const { error } = await supabase
           .from('pet_data')
           .update({
@@ -639,6 +715,31 @@ export const usePetStateWithAuth = () => {
     console.log('Current shopItems:', shopItems);
     console.log('ShopItems length:', shopItems.length);
     console.log('User:', user ? 'authenticated' : 'not authenticated');
+    
+    // Test basic Supabase connection
+    console.log('Testing basic Supabase connection...');
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('shop_items')
+        .select('count')
+        .limit(1);
+      
+      console.log('Basic connection test:', { testData, testError });
+      
+      if (testError) {
+        console.error('Supabase connection failed:', testError);
+        console.log('Error details:', {
+          message: testError.message,
+          details: testError.details,
+          hint: testError.hint,
+          code: testError.code
+        });
+        return;
+      }
+    } catch (err) {
+      console.error('Supabase connection exception:', err);
+      return;
+    }
     
     if (user) {
       console.log('Testing shop items query...');
