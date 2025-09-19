@@ -18,6 +18,7 @@ interface PetState {
 
 interface ShopItem {
   id: string;
+  item_id: string;
   name: string;
   emoji: string;
   cost: number;
@@ -66,6 +67,9 @@ export const usePetStateWithAuth = () => {
   const debouncedPetState = useDebounce(petState, 500); // Debounce for 500ms
   const optimisticUpdate = useOptimisticUpdate(petState);
   const batchUpdates = useBatchUpdates<PetState>(3, 1000); // Batch 3 updates, max 1s delay
+  
+  // Immediate save for coins to prevent loss on refresh
+  const [lastCoinValue, setLastCoinValue] = useState(petState.coins);
 
   // Load pet data from database or localStorage
   useEffect(() => {
@@ -142,6 +146,7 @@ export const usePetStateWithAuth = () => {
   useEffect(() => {
     const loadShopItems = async () => {
       try {
+        console.log('Loading shop items...');
         const { data, error } = await supabase
           .from('shop_items')
           .select('*')
@@ -149,10 +154,41 @@ export const usePetStateWithAuth = () => {
           .order('category', { ascending: true })
           .order('cost', { ascending: true });
 
+        console.log('Shop items response:', { data, error });
+
         if (error) {
           console.error('Error loading shop items:', error);
         } else {
-          setShopItems(data || []);
+          console.log('Loaded shop items:', data?.length || 0, 'items');
+          
+          // If no shop items exist, try to initialize them
+          if (!data || data.length === 0) {
+            console.log('No shop items found, attempting to initialize...');
+            try {
+              const { error: initError } = await supabase.rpc('initialize_shop_items');
+              if (initError) {
+                console.error('Error initializing shop items:', initError);
+              } else {
+                console.log('Shop items initialized successfully');
+                // Reload shop items after initialization
+                const { data: newData, error: reloadError } = await supabase
+                  .from('shop_items')
+                  .select('*')
+                  .eq('is_active', true)
+                  .order('category', { ascending: true })
+                  .order('cost', { ascending: true });
+                
+                if (!reloadError && newData) {
+                  console.log('Reloaded shop items:', newData.length, 'items');
+                  setShopItems(newData);
+                }
+              }
+            } catch (initErr) {
+              console.error('Error initializing shop items:', initErr);
+            }
+          } else {
+            setShopItems(data);
+          }
         }
       } catch (err) {
         console.error('Error loading shop items:', err);
@@ -266,12 +302,28 @@ export const usePetStateWithAuth = () => {
     });
   }, [user, batchUpdates]);
 
-  // Save state with debounce and batching
+  // Immediate save for coins when they change
+  useEffect(() => {
+    if (!isLoading && petState.coins !== lastCoinValue) {
+      console.log('Coins changed, saving immediately:', petState.coins);
+      setLastCoinValue(petState.coins);
+      // Save coins immediately to prevent loss on refresh
+      savePetDataToDatabase(petState);
+    }
+  }, [petState.coins, isLoading, lastCoinValue, savePetDataToDatabase]);
+
+  // Save state with debounce and batching (excluding coins)
   useEffect(() => {
     if (!isLoading && debouncedPetState !== petState) {
-      console.log('Adding to batch:', debouncedPetState);
-      // Add to batch for processing
-      batchUpdates.addToBatch('pet-state', debouncedPetState);
+      // Only batch non-coin changes
+      const { coins, ...otherState } = debouncedPetState;
+      const currentStateWithoutCoins = { ...petState, coins: petState.coins };
+      
+      if (JSON.stringify(otherState) !== JSON.stringify({ ...currentStateWithoutCoins, coins: undefined })) {
+        console.log('Adding to batch:', debouncedPetState);
+        // Add to batch for processing
+        batchUpdates.addToBatch('pet-state', debouncedPetState);
+      }
     }
   }, [debouncedPetState, isLoading, batchUpdates, petState]);
 
@@ -382,18 +434,110 @@ export const usePetStateWithAuth = () => {
     setError(null);
 
     try {
+      console.log('Attempting to purchase item:', itemId);
+      
+      // First, get the item details
+      const { data: itemData, error: itemError } = await supabase
+        .from('shop_items')
+        .select('*')
+        .eq('item_id', itemId)
+        .eq('is_active', true)
+        .single();
+
+      if (itemError || !itemData) {
+        setError(new AppError('Przedmiot nie został znaleziony', 'ITEM_NOT_FOUND', 'medium'));
+        return false;
+      }
+
+      // Check if user already owns this item
+      const { data: ownedData, error: ownedError } = await supabase
+        .from('purchased_items')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('item_id', itemId)
+        .single();
+
+      if (ownedData) {
+        setError(new AppError('Już posiadasz ten przedmiot', 'ITEM_ALREADY_OWNED', 'medium'));
+        return false;
+      }
+
+      // Check if user has enough coins
+      if (petState.coins < itemData.cost) {
+        setError(new AppError('Nie masz wystarczająco monet', 'INSUFFICIENT_COINS', 'medium'));
+        return false;
+      }
+
+      // Try to use the RPC function first
       const { data, error } = await supabase.rpc('purchase_item', {
         p_item_id: itemId
       });
 
+      console.log('Purchase response:', { data, error });
+
       if (error) {
-        const appError = handleSupabaseError(error, 'purchaseItem');
-        setError(appError);
-        console.error('Error purchasing item:', appError);
-        return false;
+        console.log('RPC function failed, trying manual purchase...');
+        
+        // Fallback: manual purchase
+        const newCoins = petState.coins - itemData.cost;
+        
+        // Update coins
+        const { error: updateError } = await supabase
+          .from('pet_data')
+          .update({ 
+            coins: newCoins, 
+            last_update_time: new Date().toISOString() 
+          })
+          .eq('user_id', user.id);
+
+        if (updateError) {
+          const appError = handleSupabaseError(updateError, 'purchaseItem');
+          setError(appError);
+          console.error('Error updating coins:', appError);
+          return false;
+        }
+
+        // Add purchased item
+        const { error: purchaseError } = await supabase
+          .from('purchased_items')
+          .insert({
+            user_id: user.id,
+            item_id: itemId
+          });
+
+        if (purchaseError) {
+          const appError = handleSupabaseError(purchaseError, 'purchaseItem');
+          setError(appError);
+          console.error('Error adding purchased item:', appError);
+          return false;
+        }
+
+        console.log('Manual purchase successful, updating coins to:', newCoins);
+        // Update pet state with new coin amount
+        setPetState(prev => ({
+          ...prev,
+          coins: newCoins,
+          lastUpdateTime: Date.now()
+        }));
+
+        // Reload purchased items
+        const { data: newPurchasedItems, error: reloadError } = await supabase
+          .from('purchased_items')
+          .select(`
+            *,
+            shop_item:shop_items(*)
+          `)
+          .eq('user_id', user.id);
+
+        if (!reloadError && newPurchasedItems) {
+          setPurchasedItems(newPurchasedItems);
+        }
+
+        return true;
       }
 
       if (data && data.success) {
+        console.log('Purchase successful, updating coins to:', data.remaining_coins);
         // Update pet state with new coin amount
         setPetState(prev => ({
           ...prev,
@@ -416,6 +560,7 @@ export const usePetStateWithAuth = () => {
 
         return true;
       } else {
+        console.log('Purchase failed:', data?.error);
         setError(new AppError(data?.error || 'Nie udało się kupić przedmiotu', 'PURCHASE_FAILED', 'medium'));
         return false;
       }

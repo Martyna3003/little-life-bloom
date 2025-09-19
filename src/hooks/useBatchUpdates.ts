@@ -58,10 +58,10 @@ export function useBatchUpdates<T>(
 
     setIsUpdating(true);
     
-    // Show sync message after 1 second delay
+    // Show sync message after 5 second delay
     syncMessageTimeoutRef.current = setTimeout(() => {
       setShowSyncMessage(true);
-    }, 1000);
+    }, 5000);
     
     try {
       await onBatchProcess.current(updates);
